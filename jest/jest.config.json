@@ -1,0 +1,10 @@
+{
+  "transform": {
+    ".*": "./jest/webpack-preprocessor.js"
+  },
+  "testPathIgnorePatterns": [
+    "/tmp/",
+    "/dist/",
+    "/node_modules/"
+  ]
+}
