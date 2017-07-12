@@ -41,6 +41,35 @@ const animate = builder(() => {
   // assert.equal(at(1).a(at(0), 0, 0, 0, 1), 1);
   // assert.equal(at(1).a(at(0), 1, 0, 0, 1), 0);
 
+  const velocity = (posfn, velocityKey) => {
+    const f = (t, state, begin, end) => posfn(t, state, begin, end);
+    f.a = (otherposfn, t, state, begin, end) => {
+      const b = posfn(t, state, begin, end);
+      const e = otherposfn(t, state, begin, end);
+      // Consider the needed velocity for the following lines.
+      const n = e - b;
+      // Devide old velocity by needed velocity. If they are the same sign, the
+      // value will be positive. If less than 1 max will increase it to one.
+      // This handles making sure the used velocity has a matching sign to the
+      // needed velocity. With this we create a ratio of the velocity over the
+      // needed velocity.
+      const r = Math.max(1, state[velocityKey] / n);
+      // Update the stored velocity by multiple the needed velocity by the ratio
+      // turning it back into the original velocity or the new needed velocity.
+      state[velocityKey] = r * n;
+      // Perform the normal `at` interpolation using the ratio to manipulate the
+      // t value.
+      return n * Math.min(1, r * t) + b;
+    };
+    f.eq = (t, state, begin, end) => posfn(t, state, begin, end);
+    f.clone = state => state;
+    f.copy = (dest, src) => src;
+    return f;
+  };
+
+  // velocity(at(0), 'v').to(at(1))
+  // velocity(0, 'v').to(velocity(1, 'v'))
+
   const fromTo = ([a, b]) => {
     const f = (t, state, begin, end) => a.a(b, t, state, begin, end);
     f.eq = (...args) => b.eq(...args);
