@@ -1,6 +1,8 @@
+import 'babel-polyfill';
+
 import PropTypes from 'prop-types';
 import React, {Children} from 'react';
-import {TransitionGroup} from 'react-transition-group';
+import {CSSTransitionGroup, TransitionGroup} from 'react-transition-group';
 import {render, findDOMNode} from 'react-dom';
 
 import {Animated, animate, update, present} from 'uap';
@@ -169,10 +171,10 @@ class RAnimated extends React.Component {
 
     this.stage = 'init';
 
-    this.elements = props.elements;
-    if (props.update && props.animate && props.present) {
-      const animatedProps = Object.assign({}, props);
-      const _willAnimate = props.willAnimate;
+    const animatedProps = this.animatedProps = Object.assign({}, props.animation, props);
+    this.elements = animatedProps.elements;
+    if (animatedProps.update && animatedProps.animate && animatedProps.present) {
+      const _willAnimate = animatedProps.willAnimate;
       const willAnimate = animatedProps.willAnimate = () => {
         if (this.stage === 'ready') {
           this.stage = 'animating';
@@ -181,7 +183,7 @@ class RAnimated extends React.Component {
           _willAnimate();
         }
       };
-      const _didAnimate = props.didAnimate;
+      const _didAnimate = animatedProps.didAnimate;
       const didAnimate = animatedProps.didAnimate = () => {
         if (this.stage === 'animating') {
           // this.animated.update(this.animated.elements.root.element, this.animated.state, this.animated);
@@ -209,17 +211,20 @@ class RAnimated extends React.Component {
   }
 
   componentWillReceiveProps(newProps) {
-    this.elements = newProps.elements;
     if (this.animated) {
       // console.log('componentWillReceiveProps');
-      const animatedProps = Object.assign({}, newProps);
-      if (this.animated.update !== this.props.update) {
+      const animatedProps = Object.assign({}, newProps.animation, newProps);
+      Object.assign(this.animatedProps, newProps.animation, newProps);
+      this.elements = animatedProps.elements;
+      // If the main functions are not the existing functions then temporary
+      // ones like animateLeave are in use.
+      if (this.animated.update !== this.animatedProps.update) {
         animatedProps.update = this.animated.update;
       }
-      if (this.animated.animate !== this.props.animate) {
+      if (this.animated.animate !== this.animatedProps.animate) {
         animatedProps.animate = this.animated.animate;
       }
-      if (this.animated.present !== this.props.present) {
+      if (this.animated.present !== this.animatedProps.present) {
         animatedProps.present = this.animated.present;
       }
       Object.assign(this.animated, animatedProps, {elements: this.animated.elements});
@@ -335,14 +340,14 @@ class RAnimated extends React.Component {
       return Promise.resolve();
     }
     return new Promise(resolve => {
-      if (this.props.updateEnter || this.props.animateEnter) {
-        const update = this.props.updateEnter || this.animated.update;
+      if (this.animatedProps.updateEnter || this.animatedProps.animateEnter) {
+        const update = this.animatedProps.updateEnter || this.animated.update;
         const animate = this.animated.animate;
-        if (this.props.animateEnter) {
-          this.animated.animate = this.props.animateEnter;
+        if (this.animatedProps.animateEnter) {
+          this.animated.animate = this.animatedProps.animateEnter;
         }
         const present = this.animated.present;
-        const presentEnter = this.props.presentEnter;
+        const presentEnter = this.animatedProps.presentEnter;
         if (presentEnter) {
           // console.log('presentEnter');
           this.animated.present = presentEnter;
@@ -353,11 +358,11 @@ class RAnimated extends React.Component {
             this.stage = 'ready';
           }
           resolve();
-          if (this.animated.animate === this.props.animateEnter) {
-            this.animated.animate = this.props.animate;
+          if (this.animated.animate === this.animatedProps.animateEnter) {
+            this.animated.animate = this.animatedProps.animate;
           }
           if (this.animated.present === presentEnter) {
-            this.animated.present = this.props.present;
+            this.animated.present = this.animatedProps.present;
           }
           if (this.animated.options.didAnimate === didAnimate) {
             this.animated.options.didAnimate = _didAnimate;
@@ -402,6 +407,11 @@ class RAnimated extends React.Component {
   componentWillEnter(cb) {
     this._componentWillEnter()
     .then(cb, cb);
+    findDOMNode(this).classList.add('enter');
+  }
+
+  componentDidEnter() {
+    findDOMNode(this).classList.remove('enter');
   }
 
   __componentWillLeave() {
@@ -412,31 +422,31 @@ class RAnimated extends React.Component {
       return Promise.resolve();
     }
     return new Promise(resolve => {
-      if (this.props.updateLeave || this.props.animateLeave) {
+      if (this.animatedProps.updateLeave || this.animatedProps.animateLeave) {
         const update = this.animated.update;
-        if (this.props.updateLeave) {
-          this.animated.update = this.props.updateLeave;
+        if (this.animatedProps.updateLeave) {
+          this.animated.update = this.animatedProps.updateLeave;
         }
         const animate = this.animated.animate;
-        if (this.props.animateLeave) {
-          this.animated.animate = this.props.animateLeave;
+        if (this.animatedProps.animateLeave) {
+          this.animated.animate = this.animatedProps.animateLeave;
         }
         const present = this.animated.present;
-        if (this.props.presentLeave) {
-          this.animated.present = this.props.presentLeave;
+        if (this.animatedProps.presentLeave) {
+          this.animated.present = this.animatedProps.presentLeave;
         }
         const _didAnimate = this.animated.options.didAnimate;
         const didAnimate = this.animated.options.didAnimate = () => {
           this.stage = 'left';
           resolve();
-          if (this.animated.update === this.props.updateLeave) {
-            this.animated.update = this.props.update;
+          if (this.animated.update === this.animatedProps.updateLeave) {
+            this.animated.update = this.animatedProps.update;
           }
-          if (this.animated.animate === this.props.animateLeave) {
-            this.animated.animate = this.props.animate;
+          if (this.animated.animate === this.animatedProps.animateLeave) {
+            this.animated.animate = this.animatedProps.animate;
           }
-          if (this.animated.present === this.props.presentLeave) {
-            this.animated.present = this.props.present;
+          if (this.animated.present === this.animatedProps.presentLeave) {
+            this.animated.present = this.animatedProps.present;
           }
           if (this.animated.options.didAnimate === didAnimate) {
             this.animated.options.didAnimate = _didAnimate;
@@ -469,6 +479,11 @@ class RAnimated extends React.Component {
   componentWillLeave(cb) {
     this._componentWillLeave()
     .then(cb, cb);
+    findDOMNode(this).classList.add('leave');
+  }
+
+  componentDidLeave() {
+    findDOMNode(this).classList.remove('leave');
   }
 
   addChild(child) {
@@ -510,118 +525,161 @@ RAnimated.childContextTypes = {
   animatedParent: PropTypes.object,
 };
 
+const baseAnimate = animate.object({
+  x: animate.begin().to(animate.end()),
+  // x: animate.begin().to(animate.end())
+  // .easing(t => t < 0.5 ? -t : (1 - -0.5) * ((t - 0.5) * 2) + -0.5),
+  y: animate.begin().to(animate.end()),
+  width: animate.begin().to(animate.end()),
+  height: animate.begin().to(animate.end()),
+  opacity: animate.begin().to(animate.end()),
+});
+
+const animates = [
+  baseAnimate.duration(1 / 3),
+  // baseAnimate.easing(t => 3 * t),
+  // baseAnimate.easing(t => t < 0.5 ? -t : (1 - -0.5) * ((t - 0.5) * 2) + -0.5).easing(t => 2 * t),
+  // baseAnimate.easing(t => 1 / (1 - t + 0.0001) - 1),
+];
+
+const animation = {
+  elements: {root: 'root'},
+  update: update.object({
+    x: element => element.getBoundingClientRect().left,
+    y: element => element.getBoundingClientRect().top,
+    width: element => element.getBoundingClientRect().width,
+    height: element => element.getBoundingClientRect().height,
+    opacity: () => 1,
+  }),
+  updateEnter: update.object({
+    x: element => element.getBoundingClientRect().left,
+    y: element => element.getBoundingClientRect().top,
+    width: element => element.getBoundingClientRect().width,
+    height: element => element.getBoundingClientRect().height,
+    opacity: () => 0,
+  }),
+  updateLeave: update.object({
+    x: element => element.getBoundingClientRect().left,
+    y: element => element.getBoundingClientRect().top,
+    width: element => element.getBoundingClientRect().width,
+    height: element => element.getBoundingClientRect().height,
+    opacity: () => 0,
+  }),
+  animate: baseAnimate.duration(1 / 3),
+  // animate: animate.duration(0.3,
+  //   animate.object({
+  //     x: animate.begin(),
+  //     y: animate.begin(),
+  //     width: animate.begin(),
+  //     height: animate.begin(),
+  //     opacity: animate.begin(),
+  //   })
+  //   .to(animate.object({
+  //     x: animate.end(),
+  //     y: animate.end(),
+  //     width: animate.end(),
+  //     height: animate.end(),
+  //     opacity: animate.end(),
+  //   }))
+  // ),
+  // present: present.rect(),
+  present: present.styles({
+    // transform: present.translate([
+    //   present.key('x').sub(present.key('x').end).px(),
+    //   present.key('y').sub(present.key('y').end).px(),
+    // ]),
+  // }),
+    transform: present.concat([
+      // () => 'translateZ(0) ',
+      present.translate([
+        // present.value(({x, width}, {end}) => x - end.x - (end.width - width) / 2).px(),
+        // present.value(({y, height}, {end}) => y - end.y - (end.height - height) / 2).px(),
+        present.key('x').sub(present.key('x').end())
+        .sub(
+          present.key('width').end()
+          .sub(present.key('width'))
+          .div(present.constant(2))
+        ).px(),
+        present.key('y').sub(present.key('y').end())
+        .sub(
+          present.key('width').end()
+          .sub(present.key('width'))
+          .div(present.constant(2))
+        ).px(),
+      ]),
+      // present.value(({width}, {end}) => ` scale(${width / end.width})`),
+      // present.value(({opacity}) => ` scale(${1 - (0.5 - opacity / 2)})`),
+      () => ' ',
+      present.scale([
+        present.key('width').div(present.key('width').end()),
+      ]),
+      () => ' ',
+      present.scale([
+        present.value(state => 1 - (0.5 - state.opacity / 2)),
+      ]),
+    ]),
+    opacity: present.key('opacity'),
+  }),
+  // presentEnter: present.styles({
+  //   transform: present.concat([
+  //     () => 'translateZ(0) ',
+  //     present.translate([
+  //       present.key('x').sub(present.key('x').end())
+  //       .sub(
+  //         present.key('width').end()
+  //         .sub(present.key('width'))
+  //         .div(present.constant(2))
+  //       ).px(),
+  //       present.key('y').sub(present.key('y').end())
+  //       .sub(
+  //         present.key('width').end()
+  //         .sub(present.key('width'))
+  //         .div(present.constant(2))
+  //       ).px(),
+  //     ]),
+  //     () => ' ',
+  //     present.scale([
+  //       present.value(state => 1 - (0.5 - state.opacity / 2)),
+  //     ]),
+  //   ]),
+  //   opacity: present.key('opacity'),
+  // }),
+  // presentLeave: present.styles({
+  //   transform: present.concat([
+  //     () => 'translateZ(0) ',
+  //     present.translate([
+  //       present.key('x').sub(present.key('x').end())
+  //       .sub(
+  //         present.key('width').end()
+  //         .sub(present.key('width'))
+  //         .div(present.constant(2))
+  //       ).px(),
+  //       present.key('y').sub(present.key('y').end())
+  //       .sub(
+  //         present.key('width').end()
+  //         .sub(present.key('width'))
+  //         .div(present.constant(2))
+  //       ).px(),
+  //     ]),
+  //     () => ' ',
+  //     present.scale([
+  //       present.value(state => 1 - (0.5 - state.opacity / 2)),
+  //     ]),
+  //   ]),
+  //   opacity: present.key('opacity'),
+  // }),
+};
+
 const Page1Item = ({img, name, onClick}) => (
   <RAnimated name={name}
-    elements={{root: 'root'}}
-    update={update.object({
-      x: element => element.getBoundingClientRect().left,
-      y: element => element.getBoundingClientRect().top,
-      width: element => element.getBoundingClientRect().width,
-      height: element => element.getBoundingClientRect().height,
-      opacity: () => 1,
-    })}
-    updateEnter={update.object({
-      x: element => element.getBoundingClientRect().left,
-      y: element => element.getBoundingClientRect().top,
-      width: element => element.getBoundingClientRect().width,
-      height: element => element.getBoundingClientRect().height,
-      opacity: () => 0,
-    })}
-    updateLeave={update.object({
-      x: element => element.getBoundingClientRect().left,
-      y: element => element.getBoundingClientRect().top,
-      width: element => element.getBoundingClientRect().width,
-      height: element => element.getBoundingClientRect().height,
-      opacity: () => 0,
-    })}
-    animate={animate.duration(0.3, animate.object({
-      x: animate.begin().to(animate.end()),
-      y: animate.begin().to(animate.end()),
-      width: animate.begin().to(animate.end()),
-      height: animate.begin().to(animate.end()),
-      opacity: animate.begin().to(animate.end()),
-    }))}
-    present={present.styles({
-      transform: present.concat([
-        present.translate([
-          present.key('x').sub(present.key('x').end())
-          .sub(
-            present.key('width').end()
-            .sub(present.key('width'))
-            .div(present.constant(2))
-          ).px(),
-          present.key('y').sub(present.key('y').end())
-          .sub(
-            present.key('width').end()
-            .sub(present.key('width'))
-            .div(present.constant(2))
-          ).px(),
-        ]),
-        () => ' ',
-        present.scale([
-          present.key('width').div(present.key('width').end()),
-        ]),
-        // () => ' ',
-        // present.scale([
-        //   present.value(state => 1 - (0.5 - state.opacity / 2)),
-        // ]),
-      ]),
-      opacity: present.key('opacity'),
-    })}
-    presentEnter={present.styles({
-      transform: present.concat([
-        present.translate([
-          present.key('x').sub(present.key('x').end())
-          .sub(
-            present.key('width').end()
-            .sub(present.key('width'))
-            .div(present.constant(2))
-          ).px(),
-          present.key('y').sub(present.key('y').end())
-          .sub(
-            present.key('width').end()
-            .sub(present.key('width'))
-            .div(present.constant(2))
-          ).px(),
-        ]),
-        () => ' ',
-        present.scale([
-          present.value(state => 1 - (0.5 - state.opacity / 2)),
-        ]),
-      ]),
-      opacity: present.key('opacity'),
-    })}
-    presentLeave={present.styles({
-      transform: present.concat([
-        present.translate([
-          present.key('x').sub(present.key('x').end())
-          .sub(
-            present.key('width').end()
-            .sub(present.key('width'))
-            .div(present.constant(2))
-          ).px(),
-          present.key('y').sub(present.key('y').end())
-          .sub(
-            present.key('width').end()
-            .sub(present.key('width'))
-            .div(present.constant(2))
-          ).px(),
-        ]),
-        () => ' ',
-        present.scale([
-          present.value(state => 1 - (0.5 - state.opacity / 2)),
-        ]),
-      ]),
-      opacity: present.key('opacity'),
+    animation={Object.assign({}, animation, {
+      animate: animates[(Math.random() * animates.length) | 0],
     })}>
-    <div className="root" onClick={onClick}
+    <div className="root page-item" onClick={onClick}
       style={{
-        position: 'relative',
         display: 'inline-block',
-        width: '90px', height: '90px',
-        margin: '5px',
       }}>
-      <img width="90" height="90" src={img} />
+      <img className="page-item-img" width="90" height="90" src={img} />
     </div>
   </RAnimated>
 );
@@ -645,82 +703,59 @@ const itemImgs = {
   p: require('./travisci.svg'),
 }
 
-const Page1 = ({names, select, shuffle}) => (
-  <TransitionGroup component="div" style={{width: '500px', maxWidth: '100vw', position: 'absolute', top: '0', left: '0'}}>
+const Page1 = ({names, select, shuffle, width = 500}) => (
+  <TransitionGroup
+    component="div"
+    style={{width: width + 'px', maxWidth: '100vw', position: 'absolute', top: '0', left: '0'}}>
     {names.map(name => (
       <RAnimated key={name}>
         <Page1Item
           name={name}
           onClick={() => select(name)}
-          img={itemImgs[name]} />
+          img={itemImgs[name.substring(0, 1)]} />
       </RAnimated>
     ))}
   </TransitionGroup>
 );
 
-const ShuffleLayer = ({names, shuffle}) => (
-  <div style={{width: '500px', maxWidth: '100vw', position: 'absolute', top: '0', left: '0'}}>
-    {names.map(name => <div key={name} style={{display: 'inline-block', width: '90px', height: '90px', margin: '5px'}} />)}
-    <div onClick={shuffle} style={{position: 'relative', userSelect: 'none'}}>Shuffle</div>
-  </div>
-);
+const shuffleLayerItemStyle = {
+  display: 'inline-block',
+  width: '90px',
+  height: '90px',
+  margin: '5px',
+};
+
+class ShuffleLayer extends React.Component {
+  shouldComponentUpdate(newProps) {
+    return (
+      this.props.width !== newProps.width ||
+      this.props.names.length !== newProps.names.length
+    );
+  }
+
+  render() {
+    const {names, shuffle, width = 500} = this.props;
+    return (
+      <div style={{width: width + 'px', maxWidth: '100vw', position: 'absolute', top: '0', left: '0'}}>
+        {names.map(name => (
+          <div key={name}
+            style={shuffleLayerItemStyle} />
+        ))}
+        <div onClick={shuffle}
+          style={{position: 'relative', userSelect: 'none'}}>Shuffle</div>
+      </div>
+    );
+  }
+}
 
 const Page2 = ({name, onBack}) => (
   <div style={{position: 'absolute', top: 0}}>
   <div onClick={onBack}>Back</div>
   <RAnimated name={name}
-    elements={{root: 'root'}}
-    update={update.object({
-      x: element => element.getBoundingClientRect().left,
-      y: element => element.getBoundingClientRect().top,
-      width: element => element.getBoundingClientRect().width,
-      height: element => element.getBoundingClientRect().height,
-      opacity: () => 1,
-    })}
-    // updateEnter={update.object({
-    //   x: element => element.getBoundingClientRect().left + 50,
-    //   y: element => element.getBoundingClientRect().top + 50,
-    // })}
-    updateLeave={update.object({
-      x: element => element.getBoundingClientRect().left + 50,
-      y: element => element.getBoundingClientRect().top + 50,
-      width: element => element.getBoundingClientRect().width,
-      height: element => element.getBoundingClientRect().height,
-      opacity: () => 0,
-    })}
-    animate={animate.duration(0.3, animate.object({
-      x: animate.begin().to(animate.end()),
-      y: animate.begin().to(animate.end()),
-      width: animate.begin().to(animate.end()),
-      height: animate.begin().to(animate.end()),
-      opacity: animate.begin().to(animate.end()),
-    }))}
-    present={present.styles({
-      transform: present.concat([
-        present.translate([
-          present.key('x').sub(present.key('x').end())
-          .sub(
-            present.key('width').end()
-            .sub(present.key('width'))
-            .div(present.constant(2))
-          ).px(),
-          present.key('y').sub(present.key('y').end())
-          .sub(
-            present.key('width').end()
-            .sub(present.key('width'))
-            .div(present.constant(2))
-          ).px(),
-        ]),
-        () => ' ',
-        present.scale([
-          present.key('width').div(present.key('width').end()),
-        ]),
-      ]),
-      opacity: present.key('opacity'),
-    })}>
+    animation={animation}>
     <div className="root"
       style={{position: 'relative', width: '200px', height: '200px'}}>
-      <img src={itemImgs[name]} />
+      <img src={itemImgs[name.substring(0, 1)]} />
     </div>
   </RAnimated>
   </div>
@@ -729,25 +764,28 @@ const Page2 = ({name, onBack}) => (
 class App extends React.Component {
   constructor(...args) {
     super(...args);
+    this.variety = [
+      'a',
+      'b',
+      'c',
+      'd',
+      'e',
+      'f',
+      'g',
+      'h',
+      'i',
+      'j',
+      'k',
+      'l',
+      'm',
+      'n',
+      'o',
+      'p',
+    ];
     this.state = {
-      names: [
-        'a',
-        'b',
-        'c',
-        'd',
-        'e',
-        'f',
-        'g',
-        'h',
-        'i',
-        'j',
-        'k',
-        'l',
-        'm',
-        'n',
-        'o',
-        'p',
-      ],
+      names: this.variety.slice(),
+      width: 500,
+      count: 10,
       page: 0,
       item: '',
     };
@@ -760,30 +798,58 @@ class App extends React.Component {
       names.sort(() => Math.random() - 0.5);
       this.setState({names});
     };
+    const onWidthChange = event => {
+      const width = Number(event.target.value);
+      if (!width) {return;}
+      this.setState({width});
+    };
+    const onCountChange = event => {
+      const count = Number(event.target.value);
+      console.log(count);
+      if (!count) {return;}
+      const names = Array(count * (this.variety.length / 10)).fill(0)
+      .map((_, i) => this.variety[i % this.variety.length] + (i >= this.variety.length ? this.variety[i / this.variety.length | 0] : ''));
+      console.log(names);
+      this.setState({names, count});
+    };
     return (
       <div>
+      <div>Width <select onChange={onWidthChange}>
+        <option value="500">500</option>
+        <option value="1000">1000</option>
+        <option value="1500">1500</option>
+        <option value="2000">2000</option>
+      </select></div>
+      <div>Count <select onChange={onCountChange}>
+        <option value="10">10</option>
+        <option value="20">20</option>
+        <option value="40">40</option>
+        <option value="80">80</option>
+      </select></div>
       <RAnimatedStates>
-        <TransitionGroup style={{position: 'relative'}}>
+        <div style={{position: 'relative', height: '1000px'}}>
           {this.state.page == 0 ?
-            <RAnimated key="shuffle">
-              <ShuffleLayer
-                names={this.state.names.slice(0, 10)}
-                shuffle={shuffle} />
-            </RAnimated> :
-            <RAnimated key="shuffle_space"><span></span></RAnimated>
+            <ShuffleLayer
+              width={this.state.width}
+              names={this.state.names.slice(0, this.state.count)}
+              shuffle={shuffle} /> :
+            <span></span>
           }
-          {this.state.page == 0 ?
-            <RAnimated key={Math.random()}>
-              <Page1
-                select={name => this.setState({page: 1, item: name})}
-                names={this.state.names.slice(0, 10)} />
-            </RAnimated> :
-            <RAnimated key="page2">
-              <Page2 name={this.state.item}
-                onBack={() => this.setState({page: 0})} />
-            </RAnimated>
-          }
-        </TransitionGroup>
+          <TransitionGroup>
+            {this.state.page == 0 ?
+              <RAnimated key={this.state.names.join('')}>
+                <Page1
+                  width={this.state.width}
+                  select={name => this.setState({page: 1, item: name})}
+                  names={this.state.names.slice(0, this.state.count)} />
+              </RAnimated> :
+              <RAnimated key="page2">
+                <Page2 name={this.state.item}
+                  onBack={() => this.setState({page: 0})} />
+              </RAnimated>
+            }
+          </TransitionGroup>
+        </div>
       </RAnimatedStates>
       </div>
     );
