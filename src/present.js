@@ -33,11 +33,15 @@ const present = builder(() => {
       f.value = () => fn;
     }
     if (typeof fn === 'function') {
-      f = (element, state, animated) => f.value(state, animated);
-      if (fn.value) {
+      if (fn.value && fn.store) {
+        return fn;
+      }
+      else if (fn.value) {
+        f = (element, state, animated) => f.value(state, animated);
         f.value = (state, animated) => fn.value(state, animated);
       }
       else {
+        f = (element, state, animated) => fn(state, animated);
         f.value = (state, animated) => fn(state, animated);
       }
     }
