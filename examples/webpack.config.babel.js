@@ -2,6 +2,7 @@ const {join} = require('path');
 
 const HardSourceWebpackPlugin = require('hard-source-webpack-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const webpack = require('webpack');
 
 const dir = (...args) => join(__dirname, ...args);
 
@@ -13,6 +14,9 @@ module.exports = {
 
   context: dir(),
   entry: {
+    'vendor': [
+      './public-path',
+    ],
     'moving-box': './moving-box',
     'many-boxes': './many-boxes',
     'flip': './flip',
@@ -20,7 +24,9 @@ module.exports = {
     'react-transition': './react-transition',
   },
   output: {
+    path: dir('../dist'),
     filename: '[name]/index.js',
+    // publicPath: '/ba-uap/',
   },
   resolve: {
     alias: {
@@ -51,6 +57,10 @@ module.exports = {
     ],
   },
   plugins: [
+    new webpack.optimize.CommonsChunkPlugin({
+      name: 'vendor',
+      filename: 'vendor.js',
+    }),
     new HtmlWebpackPlugin({
       template: './index.html.js',
       chunks: [],
@@ -69,6 +79,6 @@ module.exports = {
   ].map(name => new HtmlWebpackPlugin({
     filename: `${name}/index.html`,
     template: `./${name}/index.html.js`,
-    chunks: [name],
+    chunks: [name, 'vendor'],
   }))),
 };

@@ -2,7 +2,7 @@ export default `<!doctype html>
 <html>
   <head></head>
   <body>
-    <a href="/">Top</a>
+    <a href="..">Top</a>
     <select>
       <option value="1">1</option>
       <option value="4">4</option>
