@@ -19,9 +19,7 @@ const animate = builder(() => {
       const e = a(t, state, begin, end);
       return (e - b) * Math.min(1, t) + b;
     };
-    f.eq = (t, state, begin, end) => (
-      begin >= end ? state <= end : state >= end
-    );
+    f.eq = (t, state, begin, end) => t >= 1;
     f.clone = state => state;
     f.copy = (dest, src) => src;
     return f;
@@ -79,6 +77,62 @@ const animate = builder(() => {
   };
 
   const to = (a, b) => fromTo([a, b]);
+
+  const keyframes = frames => {
+    const timeSum = frames.reduce((carry, frame) => carry + frame.timer.t, 0);
+    const lastFrame = frames[frames.length - 1];
+    const f = (t, state, begin, end) => {
+      let i = 0;
+      for (; i < frames.length; i++) {
+        t -= frames[i].timer.t;
+        if (t < 0) {
+          return frames[i](frames[i].timer.t + t, state, begin, end);
+        }
+      }
+      return lastFrame(lastFrame.timer.t, state, begin, end);
+    };
+    f.eq = (t, state, begin, end) => t >= timeSum;
+    f.clone = state => lastFrame.fn.clone(state);
+    f.copy = (dest, src) => lastFrame.fn.copy(dest, src);
+    return f;
+  };
+
+  const frame = (timer, fn) => {
+    const f = (t, state, begin, end) => fn(timer(t), state, begin, end);
+    f.eq = (t, state, begin, end) => timer(t) >= 1;
+    f.timer = timer;
+    f.fn = fn;
+    return f;
+  };
+
+  const seconds = s => {
+    const f = t => t / s;
+    f.t = s;
+    return f;
+  };
+
+  const milliseconds = ms => {
+    const f = t => t / (ms / 1000);
+    f.t = ms / 1000;
+    return f;
+  };
+
+  const percent = p => {
+    const f = t => t / (p / 100);
+    f.t = p / 100;
+    return f;
+  };
+
+  const t = _t => {
+    const f = t => t / _t;
+    f.t = _t;
+    return f;
+  };
+
+  frame.s = (s, fn) => frame(seconds(s), fn);
+  frame.ms = (ms, fn) => frame(milliseconds(ms), fn);
+  frame.percent = (p, fn) => frame(percent(p), fn);
+  frame.t = (_t, fn) => frame(t(_t), fn);
 
   // assert.equal(fromTo([at(0), at(1)])(0, 0, 0, 1), 0);
   // assert.equal(fromTo([at(0), at(1)])(0.5, 0, 0, 1), 0.5);
@@ -138,17 +192,22 @@ const animate = builder(() => {
     const f = (t, state, begin, end) => {
       return fn(tfn(t), state, begin, end);
     };
-    f.eq = (t, state, begin, end) => fn.eq(t, state, begin, end);
+    f.eq = (t, state, begin, end) => fn.eq(tfn(t), state, begin, end);
     f.clone = state => fn.clone(state);
     f.copy = (dest, src) => fn.copy(dest, src);
     return f;
   };
 
   const duration = (seconds, fn) => {
+    if (typeof seconds !== 'number') {
+      const tmp = seconds;
+      seconds = fn;
+      fn = tmp;
+    }
     const f = (t, state, begin, end) => {
       return fn(Math.min(1, t / seconds), state, begin, end);
     };
-    f.eq = (t, state, begin, end) => fn.eq(t, state, begin, end);
+    f.eq = (t, state, begin, end) => fn.eq(Math.min(1, t / seconds), state, begin, end);
     // f.eq = t => t / seconds >= 1;
     f.clone = state => fn.clone(state);
     f.copy = (dest, src) => fn.copy(dest, src);
