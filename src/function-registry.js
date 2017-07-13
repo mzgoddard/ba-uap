@@ -1,6 +1,6 @@
 export const create = (fn, constructor = {}) => {
   function PresentFunction(f) {
-    return Object.setPrototypeOf(f, new.target.prototype);
+    return Object.setPrototypeOf(f, PresentFunction.prototype);
   }
   PresentFunction.prototype = Object.create(Function.prototype);
   PresentFunction.prototype.constructor = PresentFunction;
