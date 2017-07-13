@@ -135,6 +135,9 @@ export class Animated {
   }
 
   willRender() {
+    this.lastT = this.t;
+    this.t = 0;
+
     if (this._stored) {
       this._stored = false;
       // console.log('willRender');
@@ -143,7 +146,11 @@ export class Animated {
   }
 
   resize() {
-    this.render(() => {});
+    this.render(() => {
+      if (this.restartOnResize) {
+        this.t = 0;
+      }
+    });
   }
 
   render(fn) {
@@ -157,6 +164,8 @@ export class Animated {
     }
   }
 
+  renderState() {}
+
   didRender() {
     // console.log('didRender');
     this.update(this.elements.root.element, this.end, this);
@@ -167,8 +176,10 @@ export class Animated {
       this._stored = true;
       this.present.store(this.store, this.elements.root.element, this);
     }
-    
-    this.t = 0;
+
+    // if (this.animate.eq && this.animate.eq(this.t, this.state, this.begin, this.end)) {
+    // this.t = 0;
+    // }
 
     this.willAnimate();
   }
@@ -214,7 +225,10 @@ export class Animated {
     this.t += dt;
     this.animate(this.t, this.state, this.begin, this.end);
     // console.log(this.t);
-    if (this.animate.eq && this.animate.eq(this.t, this.state, this.begin, this.end)) {
+    if (
+      this.animate.eq &&
+      this.animate.eq(this.t, this.state, this.begin, this.end)
+    ) {
       // console.log('eq', this.t, this.animate.eq(this.t, this.state, this.begin, this.end));
       return this.didAnimate();
     }

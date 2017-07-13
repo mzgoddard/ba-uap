@@ -38,8 +38,9 @@ beforeEach(async () => {
   };
   animated = new Animated(options);
   animated.x = 10;
+  loop.once(animated.didRender, RunLoop.stages.AFTER_ITEMS);
 
-  await new Promise(resolve => setTimeout(resolve, 10));
+  await new Promise(resolve => setTimeout(resolve, 0));
 });
 
 afterEach(async () => {
