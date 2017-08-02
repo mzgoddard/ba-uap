@@ -10,9 +10,9 @@ const animate = builder(() => {
     return f;
   };
 
-  const at = pos => {
+  const lerp = fn => {
     const f = (t, state, begin, end) => {
-      return (end - begin) * pos + begin;
+      return fn(t, state, begin, end);
     };
     f.a = (a, t, state, begin, end) => {
       const b = f(t, state, begin, end);
@@ -23,6 +23,14 @@ const animate = builder(() => {
     f.clone = state => state;
     f.copy = (dest, src) => src;
     return f;
+  };
+
+  const constant = c => lerp(() => c);
+
+  const at = pos => {
+    return lerp((t, state, begin, end) => {
+      return (end - begin) * pos + begin;
+    });
   }
 
   const begin = () => at(0);
@@ -39,7 +47,7 @@ const animate = builder(() => {
   // assert.equal(at(1).a(at(0), 0, 0, 0, 1), 1);
   // assert.equal(at(1).a(at(0), 1, 0, 0, 1), 0);
 
-  const velocity = (posfn, velocityKey) => {
+  const velocity = (posfn, velocityKey = '__velocity') => {
     const f = (t, state, begin, end) => posfn(t, state, begin, end);
     f.a = (otherposfn, t, state, begin, end) => {
       const b = posfn(t, state, begin, end);
@@ -214,25 +222,50 @@ const animate = builder(() => {
     return f;
   };
 
+  // const persistTime = (fn, key = 't') => {
+  //   const f = (t, state, begin, end) => {
+  //     if (state[key] && t < state[key]) {
+  //       t += state[key];
+  //       state[key] = state[key] + (t - state[key]);
+  //       state[key] = t;
+  //       return fn(state[key])
+  //     }
+  //     else if (state[key] && t > state[key]) {
+  //
+  //     }
+  //   };
+  //   f.eq = (t, state, begin, end) => {
+  //
+  //   };
+  //   f.clone = state => fn.clone(state);
+  //   f.copy = (dest, src) => fn.copy(dest, src);
+  //   return f;
+  // };
+
   return {
     at,
     begin,
+    constant,
     duration,
     easing,
     end,
     fromTo,
+    lerp,
     object,
     to,
     value,
+    velocity,
   };
 }).freeze();
 
 export const at = animate.at;
 export const begin = animate.begin;
+export const constant = animate.constant;
 export const duration = animate.duration;
 export const easing = animate.easing;
 export const end = animate.end;
 export const fromTo = animate.fromTo;
+export const lerp = animate.lerp;
 export const object = animate.object;
 export const to = animate.to;
 export const value = animate.value;

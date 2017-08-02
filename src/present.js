@@ -97,6 +97,10 @@ const present = builder(() => {
       return value((state, animated) => ary(state, animated).join(''));
     }
     else if (Array.isArray(ary)) {
+      // let body = 'return ';
+      // const fary = ary.map(value).map(f => f.value);
+      // body += fary.map((_, i) => `ary[${i}](state, animated)`).join(' + ');
+      // return value(new Function('ary, state, animated', body).bind(null, fary));
       const fary = ary.map(value);
       return value((state, animated) => {
         let s = '';
@@ -151,6 +155,17 @@ const present = builder(() => {
 
   const properties = o => {
     const entries = (Object.entries(o));
+    // let body = '';
+    // for (let [key, value] of entries) {
+    //   if (value.value) {
+    //     body += `element.${key} = values.${key}(element.${key}, state, animated);\n`;
+    //   }
+    //   else {
+    //     body += `values.${key}(element.${key}, state, animated);\n`;
+    //   }
+    // }
+    // body += 'return element;';
+    // const f = new Function('values, element, state, animated', body).bind(null, o);
     const f = (element, state, animated) => {
       for (let [key, value] of entries) {
         if (value.value) {
@@ -193,20 +208,20 @@ const present = builder(() => {
     const entries = (Object.entries(o));
     const f = (element, state, animated) => {
       for (let [key, value] of entries) {
-        value(animated.elements[key].element, state, animated);
+        value(animated.animated.elements[key].element, state, animated);
       }
       return element;
     };
     f.store = (state, element, animated) => {
       state = state || {}
       for (let [key, value] of entries) {
-        state[key] = value.store(state[key], animated.elements[key].element, animated);
+        state[key] = value.store(state[key], animated.animated.elements[key].element, animated);
       }
       return state;
     };
     f.restore = (element, state, animated) => {
       for (let [key, value] of entries) {
-        value.restore(animated.elements[key].element, state[key], animated);
+        value.restore(animated.animated.elements[key].element, state[key], animated);
       }
       return element;
     };
