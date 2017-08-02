@@ -22,6 +22,7 @@ module.exports = {
     'flip': './flip',
     'spiral': './spiral',
     'react-transition': './react-transition',
+    'preact-transition': './preact-transition',
   },
   output: {
     path: dir('../dist'),
@@ -37,12 +38,24 @@ module.exports = {
     rules: [
       {
         test: /\.js$/,
-        exclude: [dir('../node_modules')],
+        exclude: [dir('../node_modules'), dir('preact-transition')],
         loader: 'babel-loader',
         options: {
           presets: [
             ['env', {targets: {browsers: ['chrome >= 56']}, modules: false}],
             'react',
+          ],
+        },
+      },
+      {
+        test: /\.js$/,
+        include: [dir('preact-transition')],
+        exclude: [dir('../node_modules')],
+        loader: 'babel-loader',
+        options: {
+          presets: [
+            ['env', {targets: {browsers: ['chrome >= 56']}, modules: false}],
+            'preact',
           ],
         },
       },
@@ -76,6 +89,7 @@ module.exports = {
     'flip',
     'spiral',
     'react-transition',
+    'preact-transition',
   ].map(name => new HtmlWebpackPlugin({
     filename: `${name}/index.html`,
     template: `./${name}/index.html.js`,

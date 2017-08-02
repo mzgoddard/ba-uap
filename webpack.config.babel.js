@@ -9,6 +9,7 @@ const dir = (...args) => join(__dirname, ...args);
 module.exports = {
   context: dir(),
   entry: './src/index',
+  devtool: 'source-map',
   module: {
     rules: [
       {
@@ -33,7 +34,7 @@ module.exports = {
     ],
   },
   plugins: [
-    new HardSourceWebpackPlugin(),
+    // new HardSourceWebpackPlugin(),
     {
       apply: function(compiler) {
         var start;
