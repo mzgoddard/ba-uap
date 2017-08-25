@@ -17,11 +17,12 @@ class AnimatedManager {
   }
 
   set(type, id, state) {
+    console.log(id, state, this.animations[type][state || 'default']);
     if (!this.states[id]) {
-      this.states[id] = new AnimatedState(this.animations[type]);
+      this.states[id] = new AnimatedState(this.animations[type], this.loop || RunLoop.main);
     }
-    this.states[id].set(state)
-    .then(() => {
+    this.states[id].set(state || 'default');
+    this.states[id].running.then(() => {
       this.loop.soon()
       .then(() => {
         this.stateEnd(type, id, state);
@@ -32,17 +33,22 @@ class AnimatedManager {
 
   setElement(type, id, element) {
     if (this.states[id]) {
-      if (this.states[id].animated) {
-        this.states[id].animated.root.element.style.visibility = 'hidden';
+      if (this.states[id].animated && this.states[id].animated.root.element !== element) {
+        // this.states[id].animated.root.element.style.visibility = 'hidden';
       }
-      this.states[id].schedule({root: {element}}, this.loop);
+      console.log('schedule', id);
+      this.states[id].unschedule();
+      this.states[id].schedule({root: {element}}, this.loop || RunLoop.main);
     }
   }
 
   remove(type, id) {
+    console.log('remove', id);
     if (this.states[id]) {
       this.states[id].unschedule();
       this.states[id] = null;
     }
   }
 }
+
+export default AnimatedManager
