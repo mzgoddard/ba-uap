@@ -32,28 +32,28 @@ class Preact extends Component {
   constructor(...args) {
     super(...args);
 
-    const {loop = RunLoop.main, animations} = this.props;
+    const {loop, animations} = this.props;
 
     const bus = new Bus();
 
     const animationTypes = {};
     const matcher = new Matcher();
     Object.keys(animations).forEach(key => {
-      matcher.add(key, animations[key]);
+      matcher.add(key, Object.keys(animations[key]));
       animationTypes[key.split(' ')[0]] = animations[key];
     });
 
-    const manager = new AnimatedManager(animationTypes, bus, loop);
+    const manager = new AnimatedManager(animationTypes, bus, loop || RunLoop.main);
 
     this.crawler = new PreactCrawler(bus, matcher);
 
     const tree = new TrasitionTree(new PreactNodeIdGenerator(matcher));
-    new PreactTransition(bus, tree, matcher);
+    new PreactTransition(this.crawler, bus, tree, matcher);
     new PreactComponentTransition(bus, tree, matcher);
     new PreactElementTransition(bus, tree, matcher);
   }
 
-  render() {
+  render({children}) {
     return this.crawler.inject(children[0]);
   }
 }

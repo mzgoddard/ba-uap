@@ -32,3 +32,5 @@ class PreactNodeIdGenerator {
     }
   }
 }
+
+export default PreactNodeIdGenerator;

@@ -1,3 +1,5 @@
+import BaseTransition from './base-transition';
+
 class PreactComponentTransition extends BaseTransition {
   constructor(bus, tree, matcher) {
     super(bus, tree, matcher);
@@ -55,3 +57,4 @@ class PreactComponentTransition extends BaseTransition {
   }
 }
 
+export default PreactComponentTransition;

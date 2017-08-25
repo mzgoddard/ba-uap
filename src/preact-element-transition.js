@@ -1,13 +1,17 @@
-class PreactElementTransition extends BaseTransition {
-  constructor(bus, tree, matcher) {
-    super(bus, tree, matcher);
+import BaseTransition from './base-transition';
 
-    this.stateChange = this.bus.bind('state:chage', 3);
+import RunLoop from './runloop';
+
+class PreactElementTransition extends BaseTransition {
+  constructor(bus, tree, matcher, loop) {
+    super(bus, tree, matcher);
+    this.loop = loop || RunLoop.main;
+
+    this.stateChange = this.bus.bind('state:change', 3);
 
     this.bus.on('state:end', this.onStateEnd.bind(this));
     this.bus.on('element:create', this.onElementCreate.bind(this));
     this.bus.on('element:update', this.onElementUpdate.bind(this));
-    this.bus.on('element:destroy', this.onElementDestroy.bind(this));
   }
 
   onStateEnd(type, id, animation) {
@@ -49,3 +53,5 @@ class PreactElementTransition extends BaseTransition {
     }
   }
 }
+
+export default PreactElementTransition;

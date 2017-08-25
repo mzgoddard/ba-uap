@@ -54,6 +54,7 @@ class PreactCrawler {
 
   children(_children, path) {
     let children = _children;
+    if (!children) {return children;}
     for (let i = 0, l = children.length; i < l; i++) {
       const node = this.inject(children[i], path);
       if (node !== children[i]) {
