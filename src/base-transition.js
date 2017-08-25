@@ -47,3 +47,5 @@ class BaseTransition {
     return data.didLeave;
   }
 }
+
+export default BaseTransition;
