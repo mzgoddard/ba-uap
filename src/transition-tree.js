@@ -1,29 +1,38 @@
+import inOrderUnion from './in-order-union';
+
 class TransitionList {
   constructor(tree, path, idGen) {
     this.path = path;
     this.tree = tree;
 
     this.order = [];
+    this.missed = null;
     this._tmpOrder = [];
     this._tmp2Order = [];
     this._dirtyOrder = false;
     this.mustAddNodes = false;
 
+    this.indices = [];
+
     this.nodes = {};
-    this.meta = {};
+    this._meta = {};
 
     this.isElement = idGen.isElement;
     this.nodeId = idGen.nodeId;
   }
 
   meta(key) {
-    if (!this.meta[key]) {
-      this.meta[key] = {};
+    if (!this._meta[key]) {
+      this._meta[key] = {};
     }
-    return this.meta[key];
+    return this._meta[key];
   }
 
   remove(key) {
+    if (!this.nodes[key]) {
+      return;
+    }
+
     if (this.isElement(this.nodes[key])) {
       this.tree.setElementPath(key, null);
     }
@@ -31,15 +40,14 @@ class TransitionList {
     this.tree.remove(`${this.path}.${key}`);
 
     this.nodes[key] = null;
-    this.meta[key] = null;
-    this.order[this.indices[key]] = null;
+    this._meta[key] = null;
     this._dirtyOrder = true;
   }
 
   _updateOrder() {
     if (this._dirtyOrder) {
       for (let i = this.order.length - 1; i >= 0; --i) {
-        if (!this.order[i]) {
+        if (!this.nodes[this.order[i]]) {
           this.order.splice(i, 1);
         }
       }
@@ -49,51 +57,60 @@ class TransitionList {
   }
 
   update(src, missed) {
+    missed.length = 0;
+    this.missed = missed;
     this._updateOrder();
 
     const newOrder = this._tmpOrder;
-    for (let i = 0; i < src.length; ++i) {
-      const id = this.nodeId(src[i]);
-      if (!id) {
-        if (this.order.length > 0) {
-          for (let j = 0; j < this.order.length; ++j) {
-            this.remove(this.order[j]);
+    if (src) {
+      for (let i = 0; i < src.length; ++i) {
+        const id = this.nodeId(src[i]);
+        if (!id) {
+          if (this.order.length > 0) {
+            for (let j = 0; j < this.order.length; ++j) {
+              this.remove(this.order[j]);
+            }
           }
+          this.mustAddNodes = false;
+          return;
         }
-        this.mustAddNodes = false;
-        return;
+        this._tmpOrder[i] = id;
       }
-      this._tmpOrder[i] = id;
     }
 
     const unionResult = inOrderUnion(this.order, newOrder, this._tmp2Order, missed);
-    if (unionResult === this.order) {
-      this.mustAddNodes = false;
-    }
-    else if (unionResult === this._tmpOrder) {
+    // Same order, no new or missing nodes
+    // Don't need to swap order lists
+    
+    // Different order or new nodes
+    if (unionResult === this._tmpOrder) {
       const tmp = this._tmpOrder;
       this._tmpOrder = this.order;
       this.order = tmp;
-      this.mustAddNodes = false;
-      return;
     }
+    // Missing old nodes
     else if (unionResult === this._tmp2Order) {
       const tmp = this._tmp2Order;
       this._tmp2Order = this.order;
       this.order = tmp;
-      this.mustAddNodes = true;
     }
 
     for (let i = 0; i < newOrder.length; ++i) {
       this.nodes[newOrder[i]] = src[i];
-      if (typeof src[i] === 'string') {
+      if (this.isElement(src[i])) {
         this.tree.setElementPath(newOrder[i], this.path);
       }
     }
   }
 
   missedNodes(src, dest) {
-    if (!this.mustAddNodes) {
+    for (let i = this.missed.length - 1; i >= 0; --i) {
+      if (!this.nodes[this.missed[i]]) {
+        this.missed.splice(i, 1);
+      }
+    }
+
+    if (this.missed.length === 0) {
       return src;
     }
 
@@ -134,3 +151,5 @@ class TransitionTree {
     this.elementPaths[id] = path;
   }
 }
+
+export default TransitionTree;
