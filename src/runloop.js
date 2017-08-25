@@ -67,7 +67,12 @@ export default class RunLoop {
 
     for (let stage of this.stageOrder) {
       for (let item of stage) {
-        (item.step || item)(dt);
+        try {
+          (item.step || item)(dt);
+        }
+        catch (error) {
+          console.error(error ? (error.stack || error) : error);
+        }
       }
     }
   }
