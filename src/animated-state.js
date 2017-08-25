@@ -69,7 +69,6 @@ class AnimatedState {
 
   restore() {
     if (this.animated && this.stored) {
-      console.log('restore', !!this.animated);
       this.stored = false;
       this.animation.present.restore(this.animated.root.element, this.data.store, this.data);
       this.data.begin = this.animation.update.copy(this.data.begin, this.data.state);
@@ -77,6 +76,9 @@ class AnimatedState {
   }
 
   updateStart() {
+    if (this._running) {
+      this._running();
+    }
     this.setHandlers();
     this.animation.update(this.animated.root.element, this.data.state, this.data);
     this.data.begin = this.animation.update.copy(this.data.begin, this.data.state);
@@ -92,8 +94,16 @@ class AnimatedState {
   }
 
   transition() {
-    if (!this.running) {
+    if (!this.running && this.loop) {
       this.running = this.loop.soon();
+    }
+    else if (!this.running) {
+      this.running = new Promise(resolve => {
+        this._running = resolve;
+      })
+      .then(() => {
+        this._running = null;
+      });
     }
 
     this.running = this.running
@@ -143,6 +153,11 @@ class AnimatedState {
 
   step(dt) {
     if (!this.animated) {return;}
+    if (!this.stored) {
+      return this.loop.soon()
+      .then(() => this.store())
+      .then(() => this.step(dt));
+    }
     this.data.t += dt;
     this.animation.animate(this.data.t, this.data.state, this.data.begin, this.data.end);
     if (
@@ -166,7 +181,7 @@ class AnimatedState {
     else {
       (loop || this.loop).soon().then(this._schedule);
     }
-    this.loop = (loop || RunLoop.main);
+    this.loop = (loop || this.loop || RunLoop.main);
     return this;
   }
 
@@ -181,7 +196,9 @@ class AnimatedState {
     this.restore();
     this.animated = null;
     this.data.animated = null;
-    this.loop.soon().then(this._unschedule);
+    if (this.loop) {
+      this.loop.soon().then(this._unschedule);
+    }
     return this;
   }
 
