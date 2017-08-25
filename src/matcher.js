@@ -19,10 +19,12 @@ class Matcher {
     const result = {
       id: new RegExp(id + '\\w+'),
       animationNames,
+      hasAnimation: {},
       animations: new PatternSearch(),
     };
     animationNames.forEach(name => {
       result.animations.add(name.replace('{type}', type));
+      result.hasAnimation[name] = true;
     });
     this.results[type] = result;
   }
@@ -61,6 +63,10 @@ class Matcher {
 
   matchId() {
     return this._match.id;
+  }
+
+  matchHasAnimation(name) {
+    return this.results[this.matchType()].hasAnimation[name] || false;
   }
 }
 
