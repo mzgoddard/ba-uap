@@ -3,7 +3,7 @@ import './source-map-support';
 import inOrderUnion from './in-order-union';
 
 const expectInOrder = (a, b, r) => {
-  expect(inOrderUnion(a.split(''), b.split(''))).toEqual(r.split(''));
+  expect(inOrderUnion(a.split(''), b.split(''), [], [])).toEqual(r.split(''));
 };
 
 it('merges two sets of unique names respecting order in both', () => {

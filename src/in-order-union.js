@@ -1,5 +1,5 @@
 const table = {};
-const d = [];
+const _d = [];
 const isEqual = (a, b) => {
   if (a.length === b.length) {
     let isEqual = true;
@@ -25,22 +25,24 @@ const isAll = (a, b) => {
   }
   return all;
 };
-const unionUnshift = (a, b) => {
-  const f = d;
+const unionUnshift = (a, b, d, m) => {
+  const f = d || _d;
   f.length = 0;
   for (let i = 0; i < b.length; i++) {
     f.push(b[i]);
   }
+  m.unshift(a[a.length - 1]);
   f.unshift(a[a.length - 1]);
   for (let i = a.length - 2; i > -1; --i) {
     if (table[a[i]] === -1) {
+      m.unshift(a[i]);
       f.unshift(a[i]);
     }
   }
   return f;
 };
-const unionInject = (a, b, lastMissingIndex) => {
-  const f = d;
+const unionInject = (a, b, d, m, lastMissingIndex) => {
+  const f = d || _d;
   f.length = 0;
   for (let i = 0; i < b.length; i++) {
     f.push(b[i]);
@@ -50,12 +52,13 @@ const unionInject = (a, b, lastMissingIndex) => {
       let k;
       for (k = i + 1; table[a[k]] === -1 || table[a[k]] > lastMissingIndex; ++k) {}
       lastMissingIndex = table[a[k]];
+      m.unshift(a[i]);
       f.splice(lastMissingIndex, 0, a[i]);
     }
   }
   return f;
 };
-const inOrderUnion = (a, b) => {
+const inOrderUnion = (a, b, d, m) => {
   if (a.length === 0) {
     return b;
   }
@@ -72,10 +75,10 @@ const inOrderUnion = (a, b) => {
 
   const lastMissingIndex = table[a[a.length - 1]];
   if (lastMissingIndex === -1) {
-    return unionUnshift(a, b);
+    return unionUnshift(a, b, d, m);
   }
 
-  return unionInject(a, b, lastMissingIndex);
+  return unionInject(a, b, d, m, lastMissingIndex);
 };
 
 export default inOrderUnion;
