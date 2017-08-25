@@ -138,3 +138,9 @@ RunLoop.stages = {
 if (typeof requestAnimationFrame === 'function') {
   RunLoop.main = new RunLoop();
 }
+else {
+  RunLoop.main = new RunLoop({
+    requestFrame: fn => setTimeout(fn, 16),
+    cancelFrame: id => clearTimeout(id),
+  });
+}
