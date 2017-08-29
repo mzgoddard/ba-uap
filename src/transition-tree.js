@@ -29,19 +29,51 @@ class TransitionList {
   }
 
   remove(key) {
+    // console.log('remove', key);
     if (!this.nodes[key]) {
       return;
     }
 
-    if (this.isElement(this.nodes[key])) {
-      this.tree.setElementPath(key, null);
-    }
-
-    this.tree.remove(`${this.path}.${key}`);
+    const node = this.nodes[key];
 
     this.nodes[key] = null;
     this._meta[key] = null;
     this._dirtyOrder = true;
+
+    if (node && this.isElement(node) && this.nodeId(node)) {
+      this.tree.setElementPath(key, null);
+    }
+
+    if (this.isRoot) {
+      for (let i = 0; i < this.order.length; ++i) {
+        this.tree.remove(`${this.path}.${this.order[i]}`);
+      }
+      this.tree.remove(this.path, this.isRoot);
+    }
+    else {
+      this.tree.remove(`${this.path}.${key}`);
+    }
+  }
+
+  root(key, id, node) {
+    this._updateOrder();
+    if (!this.nodes[id || key] || !this.nodes[key]) {
+      // console.log('root', this.path, key, id, !!this.nodes[id || key]);
+      for (let i = 0; i < this.order.length; ++i) {
+        this.remove(this.order[i]);
+      }
+    }
+    this.nodes[id || key] = node;
+    this.nodes[key] = node;
+    this.order.length = 0;
+    this.order[0] = key;
+    this.order[1] = id;
+    this.isRoot = true;
+
+    if (this.isElement(node) && id) {
+      this.tree.setElementPath(id, this.path);
+      // console.log(this.tree.elementPaths);
+    }
   }
 
   _updateOrder() {
@@ -56,7 +88,7 @@ class TransitionList {
     }
   }
 
-  update(src, missed) {
+  update(src, current, missed) {
     missed.length = 0;
     this.missed = missed;
     this._updateOrder();
@@ -64,16 +96,17 @@ class TransitionList {
     const newOrder = this._tmpOrder;
     if (src) {
       for (let i = 0; i < src.length; ++i) {
-        const id = this.nodeId(src[i]);
-        if (!id) {
-          if (this.order.length > 0) {
-            for (let j = 0; j < this.order.length; ++j) {
-              this.remove(this.order[j]);
-            }
-          }
-          this.mustAddNodes = false;
-          return;
-        }
+        const id = this.nodeId(src[i]) || i;
+        // if (!id) {
+        //   if (this.order.length > 0) {
+        //     for (let j = 0; j < this.order.length; ++j) {
+        //       this.remove(this.order[j]);
+        //     }
+        //   }
+        //   this.mustAddNodes = false;
+        //   return;
+        // }
+        current[i] = id;
         this._tmpOrder[i] = id;
       }
     }
@@ -97,7 +130,7 @@ class TransitionList {
 
     for (let i = 0; i < newOrder.length; ++i) {
       this.nodes[newOrder[i]] = src[i];
-      if (this.isElement(src[i])) {
+      if (this.isElement(src[i]) && this.nodeId(src[i])) {
         this.tree.setElementPath(newOrder[i], this.path);
       }
     }
@@ -143,11 +176,29 @@ class TransitionTree {
     return this.lists[this.elementPaths[id]];
   }
 
-  remove(path) {
+  remove(path, root) {
+    // console.log('remove', path);
+    if (this.lists[path]) {
+      const branch = this.lists[path];
+      const order = branch.order;
+      for (let i = 0, l = order.length; i < l; ++i) {
+        if (branch.nodes[order[i]]) {
+          branch.remove(order[i]);
+        }
+      }
+    }
+    const parent = path.substring(0, path.lastIndexOf('.'));
+    const key = path.substring(path.lastIndexOf('.') + 1);
+    if (root && this.lists[parent] && this.lists[parent].nodes[key]) {
+      this.lists[parent].remove(key);
+    }
     this.lists[path] = null;
   }
 
   setElementPath(id, path) {
+    if (this.element(id) && this.elementPaths[id] !== path && this.element(id).nodes[id]) {
+      this.element(id).remove(id);
+    }
     this.elementPaths[id] = path;
   }
 }
