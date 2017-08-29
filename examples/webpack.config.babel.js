@@ -23,6 +23,8 @@ module.exports = {
     'spiral': './spiral',
     'react-transition': './react-transition',
     'preact-transition': './preact-transition',
+    'preact-auto-transition': './preact-auto-transition',
+    'preact-ref-test': './preact-ref-test',
   },
   output: {
     path: dir('../dist'),
@@ -38,7 +40,7 @@ module.exports = {
     rules: [
       {
         test: /\.js$/,
-        exclude: [dir('../node_modules'), dir('preact-transition')],
+        exclude: [dir('../node_modules'), dir('preact-transition'), dir('preact-ref-test'), dir('preact-auto-transition')],
         loader: 'babel-loader',
         options: {
           presets: [
@@ -49,7 +51,7 @@ module.exports = {
       },
       {
         test: /\.js$/,
-        include: [dir('preact-transition')],
+        include: [dir('preact-transition'), dir('preact-ref-test'), dir('preact-auto-transition')],
         exclude: [dir('../node_modules')],
         loader: 'babel-loader',
         options: {
@@ -90,6 +92,8 @@ module.exports = {
     'spiral',
     'react-transition',
     'preact-transition',
+    'preact-auto-transition',
+    'preact-ref-test',
   ].map(name => new HtmlWebpackPlugin({
     filename: `${name}/index.html`,
     template: `./${name}/index.html.js`,
