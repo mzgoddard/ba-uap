@@ -54,7 +54,7 @@ class Preact extends Component {
   }
 
   render({children}) {
-    return this.crawler.inject(children[0]);
+    return this.crawler.inject(children[0], 'root', true);
   }
 }
 
