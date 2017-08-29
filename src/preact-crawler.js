@@ -1,17 +1,5 @@
 const {cloneElement, Component, h} = require('preact');
 
-class CrawlerCollection {
-  match() {}
-
-  matchId() {}
-
-  insertBefore() {}
-
-  insertAfter() {}
-
-  inject() {}
-}
-
 // Wrap vdom of stateful Component extending classes with this to trigger ref
 // being called before the component first renders. This way the component will
 // be hooked before that happens.
@@ -26,9 +14,9 @@ class PreactCrawler {
     this.create = bus.bind('element:create', 3);
     this.update = bus.bind('element:update', 3);
     this.destroy = bus.bind('element:destroy', 2);
-    this.componentCreate = bus.bind('component:change', 3);
+    this.componentCreate = bus.bind('component:create', 3);
     this.componentUpdate = bus.bind('component:update', 3);
-    this.componentDestroy = bus.bind('component:update', 2);
+    this.componentDestroy = bus.bind('component:destroy', 2);
 
     this.matcher = matcher;
 
@@ -56,7 +44,10 @@ class PreactCrawler {
     let children = _children;
     if (!children) {return children;}
     for (let i = 0, l = children.length; i < l; i++) {
-      const node = this.inject(children[i], path);
+      const _node = children[i];
+      const id = `${path}.${this.match(_node.attributes && _node.attributes.class || '') && this.matchId() || _node.key || i}`;
+      // console.log(id);
+      const node = this.inject(children[i], id);
       if (node !== children[i]) {
         if (children === _children) {
           children = _children.slice();
@@ -72,7 +63,7 @@ class PreactCrawler {
       const componentPath = `${path}.${key}`;
       const _render = component.render;
       component.render = (...args) => {
-        return this.inject(_render.call(component, ...args), componentPath);
+        return this.inject(_render.call(component, ...args), componentPath, true);
       };
       component.render.crawled = true;
       this.componentCreate(path, key, component);
@@ -94,7 +85,41 @@ class PreactCrawler {
     }
   }
 
-  inject(node, path) {
+  // refComponent(ref, componentRef) {
+  //
+  // }
+  //
+  // refElement(type, id, ref) {
+  //   if (ref) {
+  //     return this.pool._refElement.pop(type, id, ref);
+  //   }
+  //   else {
+  //     return this.pool._element.pop(type, id);
+  //   }
+  // }
+  //
+  // _refElement(type, id, ref, element) {
+  //   ref(element);
+  //   this._element(type, id, element);
+  // }
+  //
+  // _element(type, id, element) {
+  //   if (element) {
+  //     if (!lastClaimed) {
+  //       this.create(type, id, element);
+  //     }
+  //     else if (claimed) {
+  //       this.update(type, id, element);
+  //     }
+  //   }
+  //   else if (claimed) {
+  //     claimed = false;
+  //     this.elementClaims.delete(id);
+  //     this.destroy(type, id);
+  //   }
+  // }
+
+  inject(node, path, root) {
     if (!node) {return node;}
 
     const isComponent = typeof node.nodeName === 'function';
@@ -105,37 +130,54 @@ class PreactCrawler {
           return h(Trickster, null, [cloneElement(node, {
             ref: v => {
               _ref(v);
-              this.hook(v, path, node.nodeName.constructor.name);
+              this.hook(v, path, node.nodeName.name);
             },
           }, node.children)]);
         }
         else {
           return h(Trickster, null, [cloneElement(node, {
             ref: v => {
-              this.hook(v, path, node.nodeName.constructor.name);
+              this.hook(v, path, node.nodeName.name);
             },
           }, node.children)]);
         }
       }
       else {
-        const clone = cloneElement(node, null, node.children);
+        const _ref = node.ref || (() => {});
+        const ref = component => {
+          _ref(component);
+
+          const _path = path.substring(0, path.lastIndexOf('.'));
+          const _key = path.substring(path.lastIndexOf('.') + 1);
+          if (component) {
+            this.componentCreate(_path, _key, component);
+          }
+          else {
+            this.componentDestroy(_path, _key);
+          }
+        };
+
+        const clone = cloneElement(node, {ref}, node.children);
 
         const nodeName = node.nodeName;
-        let newName = this.statelessMap.get(nodeName);
-        if (!newName) {
-          newName = (...args) => {
-            return this.inject(nodeName(...args), `${path}.${nodeName.name}`);
-          };
-          this.statelessMap.set(nodeName, newName);
-        }
-        clone.nodeName = newName;
+        // let newName = this.statelessMap.get(nodeName);
+        // if (!newName) {
+        //   newName = (...args) => {
+        //     return this.inject(nodeName(...args), `${path}.${nodeName.name}`, true);
+        //   };
+        //   this.statelessMap.set(nodeName, newName);
+        // }
+        // clone.nodeName = newName;
+        clone.nodeName = (...args) => {
+          return this.inject(nodeName(...args), `${path}.${nodeName.name}`, true);
+        };
 
         return clone;
       }
     }
     else {
       const _children = node.children;
-      const children = this.children(_children);
+      const children = this.children(_children, path);
       if (children !== _children) {
         if (this.match(node.attributes && node.attributes.class || '')) {
           const type = this.matchType();
