@@ -8,18 +8,40 @@ const dir = (...args) => join(__dirname, ...args);
 
 module.exports = {
   context: dir(),
-  entry: './src/index',
+  entry: './src/preact',
+  output: {
+    path: dir('dist'),
+    filename: 'preact.js'
+  },
   devtool: 'source-map',
+  externals: {
+    preact: true,
+  },
+  resolve: {
+    alias: {
+      'preact$': dir('node_modules/preact/dist/preact.js'),
+    },
+  },
   module: {
     rules: [
       {
         test: /\.js$/,
-        exclude: [dir('node_modules')],
+        exclude: [dir('node_modules'), dir('src')],
         loader: 'babel-loader',
         options: {
           presets: [
             ['env', {targets: {browsers: ['chrome >= 56']}, modules: false}],
-            'react',
+          ],
+        },
+      },
+      {
+        test: /\.js$/,
+        include: [dir('src')],
+        loader: 'babel-loader',
+        options: {
+          presets: [
+            ['env', {targets: {browsers: ['chrome >= 56']}, modules: false}],
+            'preact',
           ],
         },
       },
@@ -34,6 +56,7 @@ module.exports = {
     ],
   },
   plugins: [
+    // new (require('webpack').optimize.UglifyJsPlugin)(),
     // new HardSourceWebpackPlugin(),
     {
       apply: function(compiler) {
