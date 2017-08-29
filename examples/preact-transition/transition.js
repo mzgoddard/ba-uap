@@ -106,7 +106,7 @@ class PreactTransition extends Component {
     console.log('transition appear', this.props.animatedKey);
     this._initTransition();
     return this._componentWillTransition('appear', 'componentWillAppear')
-    .then(() => console.log('transition appeared', this.props.animatedKey))
+    // .then(() => console.log('transition appeared', this.props.animatedKey))
     .then(() => cb && cb());
   }
 
@@ -115,7 +115,7 @@ class PreactTransition extends Component {
     this._initTransition();
     return Promise.resolve()
     .then(() => this._componentWillTransition('enter', 'componentWillEnter'))
-    .then(() => console.log('transition entered', this.props.animatedKey, this.transition.state.data.state.left))
+    // .then(() => console.log('transition entered', this.props.animatedKey, this.transition.state.data.state.left))
     .then(() => cb && cb());
   }
 
@@ -145,7 +145,6 @@ class PreactTransition extends Component {
   }
 
   claim(key, release) {
-    console.log('claim', key, this.claims[key], this.props.animatedKey);
     let state = null;
     if (this.claims[key]) {
       state = this.claims[key]();
