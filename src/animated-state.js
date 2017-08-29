@@ -15,8 +15,18 @@ const noopAnimation = {
   present: presentNoop,
 };
 
+const once = cb => {
+  let first = true;
+  return () => {
+    if (first) {
+      first = false;
+      cb();
+    }
+  };
+};
+
 class AnimatedState {
-  constructor(animations) {
+  constructor(animations, loop) {
     this.state = new State();
 
     this.animations = animations;
@@ -26,6 +36,7 @@ class AnimatedState {
     this.animated = null;
     this.stored = false;
     this.running = null;
+    this._resolve = function() {};
     this.insideLoop = false;
 
     this.data = {
@@ -47,15 +58,28 @@ class AnimatedState {
     this.step = this.step.bind(this);
   }
 
-  set(state, order) {
-    // console.log('set', state, order);
-    this.state.set({
-      state, order,
-      transition: this.transition,
-      cancel: this.cancel,
+  set(state, order, _cb = function() {}) {
+    const cb = once(_cb);
+    return new Promise(resolve => {
+      this.state.set({
+        state, order,
+        transition: () => {
+          return this.transition()
+          .then(() => cb());
+        },
+        cancel: () => {
+          this.cancel();
+          cb();
+        },
+      });
     });
 
-    return this;
+    // return new Promise(resolve => {
+    //   this._end = () => {
+    //     cb();
+    //     resolve();
+    //   };
+    // });
   }
 
   store() {
@@ -63,7 +87,6 @@ class AnimatedState {
       this.stored = true;
       this.animation.present.store(this.data.store, this.animated.root.element, this.data);
       this.animation.update(this.animated.root.element, this.data.end, this.data);
-      // console.log(this.data.state.left, this.data.end.left);
     }
   }
 
@@ -106,20 +129,31 @@ class AnimatedState {
       });
     }
 
-    this.running = this.running
-    .then(this.transitionStart)
-    .then(this.transitionEnd);
+    this.running = Promise.race([
+      this.running
+      .then(() => {return false;}),
+      new Promise(resolve => {this._resolve = resolve;})
+      .then(() => {return true;}),
+    ])
+    .then(canceled => {
+      if (!canceled) {
+        return this.transitionStart()
+        .then(this.transitionEnd);
+      }
+    });
 
     return this.running;
   }
 
   restart() {
+    this.data.begin.tsub += this.data.t;
     this.data.t = 0;
   }
 
-  transitionStart() {
+  transitionStart(canceled) {
     return new Promise(resolve => {
       this._resolve = resolve;
+      this.data.begin.tsub = 0;
       this.data.t = 0;
       this.setHandlers();
       this.loopAdd();
@@ -130,11 +164,21 @@ class AnimatedState {
   transitionEnd() {
     this.loopRemove();
     this.restore();
+    if (this._end) {
+      this._end();
+    }
   }
 
   cancel() {
-    this.running = null;
-    this._resolve();
+    try {
+      this.running = null;
+      this.loopRemove();
+      this.restore();
+      this._resolve('cancel');
+    }
+    catch (e) {
+      console.error(e);
+    }
   }
 
   loopAdd() {
@@ -165,7 +209,7 @@ class AnimatedState {
       this.animation.animate.eq(this.data.t, this.data.state, this.data.begin, this.data.end)
     ) {
       this.running = null;
-      this._resolve();
+      this._resolve('animation end');
     }
     this.animation.present(this.animated.root.element, this.data.state, this.data);
   }
