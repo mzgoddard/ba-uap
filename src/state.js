@@ -78,7 +78,12 @@ class State {
         item.cancel();
       }
       this.queue.length = 0;
-      start(this, {state, transition, cancel});
+      if (this.substate === SUBSTATE.READY) {
+        start(this, {state, transition, cancel});
+      }
+      else {
+        this.queue.push({state, transition, cancel});
+      }
       break;
     case ORDER.ONLY_READY:
       if (this.substate === SUBSTATE.READY) {
