@@ -24,6 +24,7 @@
     "jest": "^20.0.4",
     "jest-webpack": "^0.3.0",
     "node-object-hash": "^1.2.0",
+    "preact-render-spy": "^1.0.0-rc.8",
     "preact-transition-group": "^1.1.1",
     "promise": "^7.1.1",
     "react-transition-group": "^1.1.3",
