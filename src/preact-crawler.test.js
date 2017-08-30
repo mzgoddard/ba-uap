@@ -31,7 +31,7 @@ beforeEach(() => {
 
 class Crawler {
   render({crawler, children}) {
-    const injected = crawler.inject(children[0]);
+    const injected = crawler.inject(children[0], 'crawler');
     return injected;
   }
 }

@@ -19,7 +19,8 @@ beforeEach(() => {
   matcher.add('canLeave', ['default', 'leave']);
   tree = new TransitionTree(new PreactNodeIdGenerator(matcher));
   crawler = {
-    children(v) {return v;}
+    inject(v) {return v;},
+    children(v) {return v;},
   };
   transition = new PreactTransition(crawler, bus, tree, matcher);
   a = h('div', {class: 'base base1'});
@@ -52,8 +53,8 @@ it('does not change list missing old nodes that cannot leave', () => {
 });
 
 it('changes list missing old nodes that can leave', () => {
-  expect(tree.get('root').meta('canLeave2'))
-  .toEqual({can: {default: true, leave: true}});
+  expect(tree.get('root').meta('canLeave2').can)
+  .toEqual({default: true, leave: true});
   const list = [a, c];
   const result = crawler.children(list, 'root');
   expect(result).not.toBe(list);

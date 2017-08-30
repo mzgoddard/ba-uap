@@ -40,7 +40,7 @@ beforeEach(() => {
   elements.c.className = c.attributes.class;
   elements.d.className = d.attributes.class;
   elements.e.className = e.attributes.class;
-  tree.get('root').update([a, c, e], []);
+  tree.get('root').update([a, c, e], [], []);
 });
 
 it('primes can{animation} tests', () => {
@@ -50,7 +50,8 @@ it('primes can{animation} tests', () => {
 });
 
 it('starts enter animation on element create', async () => {
-  tree.get('root').update([a, c, d, e], []);
+  tree.get('root').count = 2;
+  tree.get('root').update([a, c, d, e], [], []);
   const animationPromise = new Promise(resolve => {
     bus.on('state:change', (type, id, animation) => {
       resolve(animation);
@@ -60,8 +61,9 @@ it('starts enter animation on element create', async () => {
   expect(await animationPromise).toBe('enter');
 });
 
-it('lets manager have time to snapshot with enter class', async () => {
-  tree.get('root').update([a, c, d, e], []);
+it('announces enter immediately', async () => {
+  tree.get('root').count = 2;
+  tree.get('root').update([a, c, d, e], [], []);
   let delayed = false;
   const delayedPromise = new Promise(resolve => {
     bus.on('state:change', (type, id, animation) => {
@@ -71,7 +73,7 @@ it('lets manager have time to snapshot with enter class', async () => {
   bus.bind('element:create', 3)('canEnter', 'canEnter1', elements.d);
   await Promise.resolve();
   delayed = true;
-  expect(await delayedPromise).toBe(true);
+  expect(await delayedPromise).toBe(false);
 });
 
 it('starts leave animation on element update', async () => {
@@ -83,7 +85,7 @@ it('starts leave animation on element update', async () => {
   expect(await animationPromise).toBe('leave');
 });
 
-it('starts leave once', async () => {
+it('starts leave every update', async () => {
   tree.get('root').meta('canLeave2').didLeave = true;
   let animationPromise = new Promise(resolve => {
     bus.on('state:change', (type, id, animation) => resolve(animation));
@@ -95,10 +97,11 @@ it('starts leave once', async () => {
     setTimeout(() => resolve(), 10);
   });
   bus.bind('element:update', 3)('canLeave', 'canLeave2', elements.e);
-  expect(await animationPromise).toBe();
+  expect(await animationPromise).toBe('leave');
 });
 
-it('removes node from tree when element finishes end animation', () => {
+it('removes node from tree when element finishes end animation', async () => {
   bus.bind('state:end', 3)('canLeave', 'canLeave2', 'leave');
+  await new Promise(r => setTimeout(r, 10));
   expect(tree.get('root').nodes['canLeave2']).toBeFalsy();
 });
