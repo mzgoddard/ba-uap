@@ -5,6 +5,8 @@ require('source-map-support').install({requireHook: true});
 const {default: State, ORDER} = require('./state');
 
 const timeout = ms => new Promise(resolve => setTimeout(resolve, ms));
+const cancelable = (p, handle) => Promise.race([p, new Promise(handle)]);
+const cancelation = () => Promise.resolve().then(() => Promise.resolve());
 
 it('has an initial state', () => {
   expect(new State().get()).toBeTruthy();
@@ -18,11 +20,17 @@ it('start the next state immediately', () => {
   }
 });
 
-it('replaces a current transition (ORDER.IMMEDIATE)', () => {
+it('replaces a current transition (ORDER.IMMEDIATE)', async () => {
   const s = new State();
-  s.set({state: 'first', transition: () => timeout(10)});
+  let cancel;
+  s.set({
+    state: 'first',
+    transition: () => cancelable(timeout(10), _c => cancel = _c),
+    cancel: () => cancel()
+  });
   expect(s.get()).toEqual('first');
   s.set({state: 'second', order: ORDER.IMMEDIATE});
+  await cancelation();
   expect(s.get()).toEqual('second');
 });
 
@@ -36,25 +44,31 @@ it('set the state (ORDER.NEXT)', () => {
   .then(() => expect(s.get()).toEqual('second'));
 });
 
-it('replaces the queued transitions (ORDER.IMMEDIATE)', () => {
+it('replaces the queued transitions (ORDER.IMMEDIATE)', async () => {
   const s = new State();
-  s.set({state: 'first', transition: () => timeout(10)});
+  let cancel;
+  s.set({
+    state: 'first',
+    transition: () => cancelable(timeout(10), c => {cancel = c;}),
+    cancel: () => cancel(),
+  });
   expect(s.get()).toEqual('first');
   s.set({state: 'second', order: ORDER.NEXT, transition: () => timeout(10)});
   expect(s.get()).toEqual('first');
   s.set({state: 'third', order: ORDER.IMMEDIATE});
+  await cancelation();
   expect(s.get()).toEqual('third');
 });
 
-it('replaces the queued transitions (ORDER.NEXT)', () => {
+it('replaces the queued transitions (ORDER.NEXT)', async () => {
   const s = new State();
   s.set({state: 'first', transition: () => timeout(10)});
   expect(s.get()).toEqual('first');
   s.set({state: 'second', order: ORDER.NEXT, transition: () => timeout(10)});
   s.set({state: 'third', order: ORDER.NEXT, transition: () => timeout(10)});
   expect(s.get()).toEqual('first');
-  return timeout(10)
-  .then(() => expect(s.get()).toEqual('third'));
+  await timeout(10);
+  expect(s.get()).toEqual('third');
 });
 
 it('set the state eventually (ORDER.QUEUE)', () => {
@@ -112,8 +126,14 @@ it('resolves setThen when transition completes', async () => {
 
 it('resolves setThen when transition is canceled', async () => {
   const s = new State();
-  const p = s.setThen({state: 'first', transition: () => timeout(10)});
+  let cancel;
+  const p = s.setThen({
+    state: 'first',
+    transition: () => cancelable(timeout(10), c => {cancel = c;}),
+    cancel: () => cancel(),
+  });
   s.setThen({state: 'second', order: ORDER.IMMEDIATE});
   await p;
+  await cancelation();
   expect(s.get()).toEqual('second');
 });
