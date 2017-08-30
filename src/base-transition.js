@@ -1,24 +1,10 @@
-class BaseTransition {
+import MatchOwner from './match-owner';
+
+class BaseTransition extends MatchOwner {
   constructor(bus, tree, matcher) {
+    super(matcher);
     this.bus = bus;
     this.tree = tree;
-    this.matcher = matcher;
-  }
-
-  match(className) {
-    return this.matcher.match(className);
-  }
-
-  matchType() {
-    return this.matcher.matchType();
-  }
-
-  matchId() {
-    return this.matcher.matchId();
-  }
-
-  matchAnimation() {
-    return this.matcher.matchAnimation();
   }
 
   can_(str, path, key) {
