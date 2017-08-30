@@ -24,17 +24,18 @@ const next = instance => {
   const item = instance.queue.shift();
   if (item) {
     start(instance, item);
+    push(item);
   }
   else {
     instance._cancel = noop;
   }
 };
 
-const start = (instance, {state, transition, cancel} = {}) => {
+const start = (instance, {state, data, transition, cancel} = {}) => {
   instance.state = state;
   instance.substate = SUBSTATE.TRANSITION;
   instance._cancel = cancel;
-  const result = transition();
+  const result = transition(data);
   if (result && result.then) {
     result.then(instance._next);
   }
@@ -43,51 +44,81 @@ const start = (instance, {state, transition, cancel} = {}) => {
   }
 };
 
+const pool = [];
+
+const pop = (state, data, transition, cancel) => {
+  const obj = pool.length ? pool.pop() : {};
+  obj.state = state;
+  obj.data = data;
+  obj.transition = transition;
+  obj.cancel = cancel;
+  return obj;
+};
+
+const push = (obj) => {
+  pool.push(obj);
+};
+
 class State {
-  constructor(initialState = '__init__') {
-    this.state = initialState;
-    this.substate = SUBSTATE.READY;
+  constructor(initialState) {
     this.queue = [];
-    this._cancel = noop;
     this._next = () => next(this);
+
+    this.clear();
+    this.use(initialState);
+  }
+
+  clear() {
+    this.state = '__init__';
+    this.substate = SUBSTATE.READY;
+    this.queue.length = 0;
+    this._cancel = noop;
+  }
+
+  use(initialState = '__init__') {
+    this.state = initialState;
   }
 
   get() {
     return this.state;
   }
 
-  set({state, order = ORDER.NEXT, transition = noop, cancel = noop} = {}) {
+  set({state, order = ORDER.NEXT, data = null, transition = noop, cancel = noop}) {
     switch (order) {
-    case ORDER.QUEUE:
-      if (this.substate === SUBSTATE.TRANSITION) {
-        this.queue.push({state, transition, cancel});
-        break;
+    case ORDER.IMMEDIATE:
+      this._cancel();
+
+      const queue = this.queue;
+      for (let i = 0, l = queue.length; i < l; ++i) {
+        queue[i].cancel();
       }
+      queue.length = 0;
+
+      if (this.substate === SUBSTATE.READY) {
+        start(this, pop(state, data, transition, cancel));
+      }
+      else {
+        queue.push(pop(state, data, transition, cancel));
+      }
+      break;
+
     case ORDER.NEXT:
       if (this.substate === SUBSTATE.TRANSITION) {
         for (const item of this.queue) {
           item.cancel();
         }
         this.queue.length = 0;
-        this.queue.push({state, transition, cancel});
+        this.queue.push(pop(state, data, transition, cancel));
         break;
       }
-    case ORDER.IMMEDIATE:
-      this._cancel();
-      for (const item of this.queue) {
-        item.cancel();
+    case ORDER.QUEUE:
+      if (this.substate === SUBSTATE.TRANSITION) {
+        this.queue.push(pop(state, data, transition, cancel));
+        break;
       }
-      this.queue.length = 0;
-      if (this.substate === SUBSTATE.READY) {
-        start(this, {state, transition, cancel});
-      }
-      else {
-        this.queue.push({state, transition, cancel});
-      }
-      break;
     case ORDER.ONLY_READY:
       if (this.substate === SUBSTATE.READY) {
-        start(this, {state, transition, cancel});
+        start(this, pop(state, data, transition, cancel));
       }
       break;
     }
