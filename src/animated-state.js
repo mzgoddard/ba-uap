@@ -15,6 +15,10 @@ const noopAnimation = {
   present: presentNoop,
 };
 
+const noop = () => {};
+const falseFn = () => {return false;};
+const trueFn = () => {return true;}
+
 const once = cb => {
   let first = true;
   return () => {
@@ -25,18 +29,71 @@ const once = cb => {
   };
 };
 
+const poolSet = [];
+
+const popSet = (state, order, data, transition, cancel) => {
+  const obj = poolSet.length ? poolSet.pop() : {};
+  obj.state = state;
+  obj.order = order;
+  obj.data = data;
+  obj.transition = transition;
+  obj.cancel = cancel;
+  return obj;
+};
+
+const pushSet = (obj) => {
+  obj.data = null;
+  obj.transition = null;
+  obj.cancel = null;
+  poolSet.push(obj);
+};
+
+const poolData = [];
+
+const popData = (cb) => {
+  const obj = poolData.length ? poolData.pop() : {};
+  obj.cb = cb;
+  obj.first = true;
+  return obj;
+};
+
+const pushData = (obj) => {
+  obj.cb = null;
+  poolData.push(obj);
+};
+
 class AnimatedState {
-  constructor(animations, loop) {
+  constructor(animations) {
     this.state = new State();
 
-    this.animations = animations;
     this.animation = {};
+    this._resolve = noop;
+    this._cb = noop;
 
-    this.loop = null;
+    this.clear().use(animations);
+
+    this.updateStart = this.updateStart.bind(this);
+    this._schedule = this._schedule.bind(this);
+    this._unschedule = this._unschedule.bind(this);
+    this._callCb = this._callCb.bind(this);
+    this._transitionSetResolve = this._transitionSetResolve.bind(this);
+    this._transitionNotCanceled = this._transitionNotCanceled.bind(this);
+    this.transition = this.transition.bind(this);
+    this.transitionStart = this.transitionStart.bind(this);
+    this.transitionEnd = this.transitionEnd.bind(this);
+    this.cancel = this.cancel.bind(this);
+    this.step = this.step.bind(this);
+  }
+
+  clear() {
+    this.state.clear();
+
     this.animated = null;
+    this.animations = null;
+    this.loop = null;
+
     this.stored = false;
     this.running = null;
-    this._resolve = function() {};
     this.insideLoop = false;
 
     this.data = {
@@ -48,38 +105,29 @@ class AnimatedState {
       end: {},
     };
 
-    this.updateStart = this.updateStart.bind(this);
-    this._schedule = this._schedule.bind(this);
-    this._unschedule = this._unschedule.bind(this);
-    this.transition = this.transition.bind(this);
-    this.transitionStart = this.transitionStart.bind(this);
-    this.transitionEnd = this.transitionEnd.bind(this);
-    this.cancel = this.cancel.bind(this);
-    this.step = this.step.bind(this);
+    return this;
   }
 
-  set(state, order, _cb = function() {}) {
-    const cb = once(_cb);
-    return new Promise(resolve => {
-      this.state.set({
-        state, order,
-        transition: () => {
-          return this.transition()
-          .then(() => cb());
-        },
-        cancel: () => {
-          this.cancel();
-          cb();
-        },
-      });
-    });
+  use(animations) {
+    this.state.use();
 
-    // return new Promise(resolve => {
-    //   this._end = () => {
-    //     cb();
-    //     resolve();
-    //   };
-    // });
+    this.animations = animations;
+
+    return this;
+  }
+
+  set(state, order, _cb) {
+    const setObj = popSet(
+      state,
+      order,
+      popData(_cb || noop),
+      this.transition,
+      this.cancel
+    );
+    this.state.set(setObj);
+    pushSet(setObj);
+
+    return this;
   }
 
   store() {
@@ -116,31 +164,44 @@ class AnimatedState {
     this.animation.present = animation.present || defaultAnimation.present || presentNoop;
   }
 
-  transition() {
+  _callCb() {
+    if (this.transitionData.first) {
+      this.transitionData.first = false;
+      this.transitionData.cb();
+    }
+  }
+
+  _transitionSetResolve(resolve) {
+    this._resolve = resolve;
+  }
+
+  _transitionNotCanceled(canceled) {
+    if (!canceled) {
+      return this.transitionStart()
+      .then(this.transitionEnd);
+    }
+  }
+
+  transition(data) {
+    if (this.transitionData) {
+      pushData(this.transitionData);
+    }
+    this.transitionData = data;
+
     if (!this.running && this.loop) {
       this.running = this.loop.soon();
     }
     else if (!this.running) {
-      this.running = new Promise(resolve => {
-        this._running = resolve;
-      })
-      .then(() => {
-        this._running = null;
-      });
+      this.running = new Promise(resolve => {this._running = resolve;})
+      .then(() => {this._running = null;});
     }
 
     this.running = Promise.race([
-      this.running
-      .then(() => {return false;}),
-      new Promise(resolve => {this._resolve = resolve;})
-      .then(() => {return true;}),
+      this.running.then(falseFn),
+      new Promise(this._transitionSetResolve).then(trueFn),
     ])
-    .then(canceled => {
-      if (!canceled) {
-        return this.transitionStart()
-        .then(this.transitionEnd);
-      }
-    });
+    .then(this._transitionNotCanceled)
+    .then(this._callCb);
 
     return this.running;
   }
@@ -150,7 +211,7 @@ class AnimatedState {
     this.data.t = 0;
   }
 
-  transitionStart(canceled) {
+  transitionStart() {
     return new Promise(resolve => {
       this._resolve = resolve;
       this.data.begin.tsub = 0;
@@ -158,15 +219,18 @@ class AnimatedState {
       this.setHandlers();
       this.loopAdd();
       this.store();
+      if (
+        this.animation.update.should &&
+        !this.animation.update.should(this.data.begin, this.data.end)
+      ) {
+        this.cancel();
+      }
     });
   }
 
   transitionEnd() {
     this.loopRemove();
     this.restore();
-    if (this._end) {
-      this._end();
-    }
   }
 
   cancel() {
@@ -174,7 +238,8 @@ class AnimatedState {
       this.running = null;
       this.loopRemove();
       this.restore();
-      this._resolve('cancel');
+      this._resolve();
+      this._callCb();
     }
     catch (e) {
       console.error(e);
@@ -209,7 +274,7 @@ class AnimatedState {
       this.animation.animate.eq(this.data.t, this.data.state, this.data.begin, this.data.end)
     ) {
       this.running = null;
-      this._resolve('animation end');
+      this._resolve();
     }
     this.animation.present(this.animated.root.element, this.data.state, this.data);
   }
