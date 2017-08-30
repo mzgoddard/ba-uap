@@ -2,6 +2,8 @@ import BaseTransition from './base-transition';
 
 import RunLoop from './runloop';
 
+const falseFn = () => false;
+
 class PreactElementTransition extends BaseTransition {
   constructor(bus, tree, matcher, loop) {
     super(bus, tree, matcher);
@@ -29,15 +31,8 @@ class PreactElementTransition extends BaseTransition {
   onStateEnd(type, id, animation) {
     if (animation === 'leave' && this.tree.element(id)) {
       Promise.race([
-        new Promise(resolve => {
-          this.alive[id] = resolve;
-        }),
-        this.loop.soon()
-        .then(() => this.loop.soon())
-        .then(() => this.loop.soon())
-        .then(() => this.loop.soon())
-        .then(() => this.loop.soon())
-        .then(() => false),
+        new Promise(resolve => {this.alive[id] = resolve;}),
+        this.loop.soon().then(falseFn),
       ])
       .then(alive => {
         this.alive[id] = null;
@@ -50,37 +45,35 @@ class PreactElementTransition extends BaseTransition {
   }
 
   onElementCreate(type, id, element) {
-    if (this.tree.element(id)) {
-      const branch = this.tree.element(id);
-      const path = branch.path;
+    const branch = this.tree.element(id);
+    if (branch) {
       const meta = branch.meta(id);
-      meta.type = type;
       meta.can = this.matcher.results[type].hasAnimation;
-      if (!this.didEnter(path, id) && this.canEnter(path, id) && branch.count > 1) {
-        const _className = element.className;
-        element.className = `${_className} enter`;
-        element.className = _className;
+      if (!meta.didEnter && meta.can.enter && branch.count > 1) {
         this.stateChange(type, id, 'enter');
       }
-      branch.meta(id).didEnter = true;
+      meta.didEnter = true;
     }
   }
 
   onElementUpdate(type, id, element) {
-    if (this.tree.element(id)) {
-      const branch = this.tree.element(id);
+    const branch = this.tree.element(id);
+    if (branch) {
       const meta = branch.meta(id);
-      meta.can = this.matcher.results[type].hasAnimation;
-      if (meta.didLeave && !meta.leaving) {
-        meta._leaving = element.className;
-        meta.leaving = `${element.className} leave`;
-        this.left[id] = [meta.leaving, element.className];
+      if (!meta.can) {
+        meta.can = this.matcher.results[type].hasAnimation;
       }
-      if (meta.didLeave && meta.leaving) {
+      if (meta.didLeave) {
+        if (!meta.leaving) {
+          meta._leaving = element.className;
+          meta.leaving = `${element.className} leave`;
+          this.left[id] = [meta.leaving, element.className];
+        }
+
         element.className = meta.leaving;
         this.stateChange(type, id, 'leave');
       }
-      if (!meta.didLeave && this.left[id]) {
+      else if (this.left[id]) {
         if (element.className === this.left[id][0]) {
           element.className = this.left[id][1];
         }
@@ -88,13 +81,10 @@ class PreactElementTransition extends BaseTransition {
         meta._leaving = null;
         meta.leaving = null;
       }
-      if (!this.didEnter(branch.path, id) && this.canEnter(branch.path, id) && branch.count > 1) {
-        const _className = element.className;
-        element.className = `${_className} enter`;
-        element.className = _className;
+      if (!meta.didEnter && meta.can.enter && branch.count > 1) {
         this.stateChange(type, id, 'enter');
       }
-      branch.meta(id).didEnter = true;
+      meta.didEnter = true;
     }
   }
 
