@@ -1,4 +1,4 @@
-export const create = (fn, constructor = {}) => {
+const create = (fn, constructor = {}) => {
   function PresentFunction(f) {
     return Object.setPrototypeOf(f, PresentFunction.prototype);
   }
@@ -6,37 +6,57 @@ export const create = (fn, constructor = {}) => {
   PresentFunction.prototype.constructor = PresentFunction;
 
   const registry = {};
-  const present = Object.assign(constructor, {
-    create(fn, constructor) {
-      if (typeof fn === 'function') {
-        return create(() => Object.assign({}, registry, fn()), constructor);
-      }
-      else {
-        return create(Object.assign({}, registry, fn), constructor);
-      }
+  const present = constructor;
+  Object.defineProperties(constructor, {
+    create: {
+      enumerable: false,
+      value(fn, constructor) {
+        if (typeof fn === 'function') {
+          return create(() => Object.assign({}, registry, fn()), constructor);
+        }
+        else {
+          return create(Object.assign({}, registry, fn), constructor);
+        }
+      },
     },
-    register(key, fn) {
-      registry[key] = fn;
-      if (registry[key] !== fn) {
-        throw new Error('Cannot register on a frozen animation builder');
-      }
-      present[key] = new PresentFunction(function(...args) {
-        return new PresentFunction(fn.call(this, ...args));
-      });
-      PresentFunction.prototype[key] = new PresentFunction(function(...args) {
-        return new PresentFunction(fn.call(this, this, ...args));
-      });
+    register: {
+      enumerable: false,
+      value(key, fn) {
+        registry[key] = fn;
+        if (process.env.NODE_ENV !== 'production' && registry[key] !== fn) {
+          throw new Error('Cannot register on a frozen animation builder');
+        }
+        present[key] = new PresentFunction(function(...args) {
+          return new PresentFunction(fn.call(this, ...args));
+        });
+        PresentFunction.prototype[key] = new PresentFunction(function(...args) {
+          return new PresentFunction(fn.call(this, this, ...args));
+        });
+        return present[key];
+      },
     },
-    cast(fn) {
-      return new PresentFunction(function(...args) {
-        return new PresentFunction(fn.bind())();
-      });
+    cast: {
+      enumerable: false,
+      value(fn) {
+        return new PresentFunction(function(...args) {
+          return new PresentFunction(fn.bind())();
+        });
+      },
     },
-    freeze() {
-      Object.freeze(registry);
-      Object.freeze(present);
-      Object.freeze(PresentFunction.prototype);
-      return present;
+    context: {
+      enumerable: false,
+      value(fn) {
+        return fn(present);
+      },
+    },
+    freeze: {
+      enumerable: false,
+      value() {
+        Object.freeze(registry);
+        Object.freeze(present);
+        Object.freeze(PresentFunction.prototype);
+        return present;
+      },
     },
   });
 
@@ -51,4 +71,5 @@ export const create = (fn, constructor = {}) => {
   return present;
 };
 
-export default create;
+module.exports = create;
+module.exports.create = create;
