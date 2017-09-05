@@ -24,6 +24,7 @@ module.exports = {
     'react-transition': './react-transition',
     'preact-transition': './preact-transition',
     'preact-auto-transition': './preact-auto-transition',
+    'preact-auto-transition-live': './preact-auto-transition-live',
     'preact-ref-test': './preact-ref-test',
   },
   output: {
@@ -40,23 +41,29 @@ module.exports = {
     rules: [
       {
         test: /\.js$/,
-        exclude: [dir('../node_modules'), dir('preact-transition'), dir('preact-ref-test'), dir('preact-auto-transition')],
+        exclude: [dir('../node_modules'), dir('preact-transition'), dir('preact-ref-test'), dir('preact-auto-transition'), dir('preact-auto-transition-live')],
         loader: 'babel-loader',
         options: {
           presets: [
-            ['env', {targets: {browsers: ['chrome >= 56']}, modules: false}],
+            ['env', {
+              modules: false,
+              loose: true
+            }],
             'react',
           ],
         },
       },
       {
         test: /\.js$/,
-        include: [dir('preact-transition'), dir('preact-ref-test'), dir('preact-auto-transition')],
+        include: [dir('preact-transition'), dir('preact-ref-test'), dir('preact-auto-transition'), dir('preact-auto-transition-live')],
         exclude: [dir('../node_modules')],
         loader: 'babel-loader',
         options: {
           presets: [
-            ['env', {targets: {browsers: ['chrome >= 56']}, modules: false}],
+            ['env', {
+              modules: false,
+              loose: true
+            }],
             'preact',
           ],
         },
@@ -93,6 +100,7 @@ module.exports = {
     'react-transition',
     'preact-transition',
     'preact-auto-transition',
+    'preact-auto-transition-live',
     'preact-ref-test',
   ].map(name => new HtmlWebpackPlugin({
     filename: `${name}/index.html`,
