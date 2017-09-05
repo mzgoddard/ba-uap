@@ -19,44 +19,63 @@ const SUBSTATE = {
 
 const noop = () => {};
 
+
+class StateInfo {
+  constructor() {
+    this.state = '';
+    this.data = null;
+    this.transition = noop;
+    this.cancel = noop;
+  }
+
+  clear() {
+    this.data = null;
+    this.transition = noop;
+    this.cancel = noop;
+    return this;
+  }
+
+  set(state, data, transition, cancel) {
+    this.state = state;
+    this.data = data;
+    this.transition = transition || noop;
+    this.cancel = cancel || noop;
+    return this;
+  }
+}
+
+const infoPool = [];
+
+StateInfo.pop = (state, data, transition, cancel) => {
+  return (infoPool.pop() || new StateInfo()).set(state, data, transition, cancel);
+};
+
+StateInfo.push = info => {
+  infoPool.push(info.clear());
+};
+
 const next = instance => {
   instance.substate = SUBSTATE.READY;
   const item = instance.queue.shift();
   if (item) {
     start(instance, item);
-    push(item);
   }
   else {
     instance._cancel = noop;
   }
 };
 
-const start = (instance, {state, data, transition, cancel} = {}) => {
-  instance.state = state;
+const start = (instance, info) => {
+  instance.state = info.state;
   instance.substate = SUBSTATE.TRANSITION;
-  instance._cancel = cancel;
-  const result = transition(data);
+  instance._cancel = info.cancel;
+  const result = info.transition(info.data);
   if (result && result.then) {
     result.then(instance._next);
   }
   else {
     instance._next();
   }
-};
-
-const pool = [];
-
-const pop = (state, data, transition, cancel) => {
-  const obj = pool.length ? pool.pop() : {};
-  obj.state = state;
-  obj.data = data;
-  obj.transition = transition;
-  obj.cancel = cancel;
-  return obj;
-};
-
-const push = (obj) => {
-  pool.push(obj);
 };
 
 class State {
@@ -83,22 +102,34 @@ class State {
     return this.state;
   }
 
-  set({state, order = ORDER.NEXT, data = null, transition = noop, cancel = noop}) {
-    switch (order) {
+  set(info) {
+    switch (info.order || ORDER.NEXT) {
     case ORDER.IMMEDIATE:
       this._cancel();
 
-      const queue = this.queue;
-      for (let i = 0, l = queue.length; i < l; ++i) {
-        queue[i].cancel();
+      if (this.queue.length) {
+        for (let i = 0, l = this.queue.length; i < l; ++i) {
+          this.queue[i].cancel();
+        }
+        this.queue.length = 0;
       }
-      queue.length = 0;
 
       if (this.substate === SUBSTATE.READY) {
-        start(this, pop(state, data, transition, cancel));
+        // inline start(...)
+        this.state = info.state;
+        this.substate = SUBSTATE.TRANSITION;
+        this._cancel = info.cancel || noop;
+        const result = (info.transition || noop)(info.data);
+        if (result && result.then) {
+          result.then(this._next);
+        }
+        else {
+          this._next();
+        }
       }
       else {
-        queue.push(pop(state, data, transition, cancel));
+        this._cancel = noop;
+        this.queue.push(StateInfo.pop(info.state, info.data, info.transition, info.cancel));
       }
       break;
 
@@ -108,17 +139,17 @@ class State {
           item.cancel();
         }
         this.queue.length = 0;
-        this.queue.push(pop(state, data, transition, cancel));
+        this.queue.push(StateInfo.pop(info.state, info.data, info.transition, info.cancel));
         break;
       }
     case ORDER.QUEUE:
       if (this.substate === SUBSTATE.TRANSITION) {
-        this.queue.push(pop(state, data, transition, cancel));
+        this.queue.push(StateInfo.pop(info.state, info.data, info.transition, info.cancel));
         break;
       }
     case ORDER.ONLY_READY:
       if (this.substate === SUBSTATE.READY) {
-        start(this, pop(state, data, transition, cancel));
+        start(this, StateInfo.pop(info.state, info.data, info.transition, info.cancel));
       }
       break;
     }
