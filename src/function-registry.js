@@ -58,6 +58,12 @@ const create = (fn, constructor = {}) => {
         return present;
       },
     },
+    toString: {
+      enumerable: false,
+      value() {
+        return `{${Object.entries(registry).map(([key, value]) => `${key}: ${value.toString()}`).join(',\n')}}`;
+      },
+    },
   });
 
   let obj = fn;
