@@ -1,14 +1,22 @@
-const {cloneElement, Component, h} = require('preact');
+import {cloneElement, Component, h} from 'preact';
+
+import MatchOwner from './match-owner';
+
+const noop = () => {};
+
+const BoxartVNode = function BoxartVNode() {};
 
 // Wrap vdom of stateful Component extending classes with this to trigger ref
 // being called before the component first renders. This way the component will
 // be hooked before that happens.
-const Trickster = ({children}) => {
-  return children[0];
+const BoxartWrap = function BoxartWrap({hooked}) {
+  return hooked;
 };
 
-class PreactCrawler {
+class PreactCrawler extends MatchOwner {
   constructor(bus, matcher) {
+    super(matcher);
+
     this.bus = bus;
     this.change = bus.bind('state:change', 3);
     this.create = bus.bind('element:create', 3);
@@ -18,37 +26,21 @@ class PreactCrawler {
     this.componentUpdate = bus.bind('component:update', 3);
     this.componentDestroy = bus.bind('component:destroy', 2);
 
-    this.matcher = matcher;
-
-    this.statelessMap = new WeakMap();
-    this.elementClaims = new Map();
-  }
-
-  match(str) {
-    return this.matcher.match(str);
-  }
-
-  matchType() {
-    return this.matcher.matchType();
-  }
-
-  matchAnimation() {
-    return this.matcher.matchAnimation();
-  }
-
-  matchId() {
-    return this.matcher.matchId();
+    this.elementClaims = {};
   }
 
   children(_children, path) {
+    if (!_children || !_children.length) {return _children;}
     let children = _children;
-    if (!children) {return children;}
     for (let i = 0, l = children.length; i < l; i++) {
-      const _node = children[i];
-      const id = `${path}.${this.match(_node.attributes && _node.attributes.class || '') && this.matchId() || _node.key || i}`;
-      // console.log(id);
-      const node = this.inject(children[i], id);
-      if (node !== children[i]) {
+      const child = children[i];
+      const _node = child;
+      const id = `${path}.${
+        this.matchNode(_node) && this.matchId() ||
+        _node.key || i
+      }`;
+      const node = this.inject(child, id);
+      if (node !== child) {
         if (children === _children) {
           children = _children.slice();
         }
@@ -58,251 +50,150 @@ class PreactCrawler {
     return children;
   }
 
-  hook(component, path, key) {
-    if (component && component.render && !component.render.crawled) {
-      const componentPath = `${path}.${key}`;
-      const _render = component.render;
-      component.render = (...args) => {
-        return this.inject(_render.call(component, ...args), componentPath, true);
-      };
-      component.render.crawled = true;
-      this.componentCreate(path, key, component);
-    }
-    else if (component && component.render && component.render.crawled) {
-      this.componentUpdate(path, key, component);
-    }
-    else {
-      this.componentDestroy(path, key);
-    }
-  }
-
-  injectChild(node, path, index, siblings) {
-    if (node) {
-      return this.inject(node, `${path}.${node.key || index}`);
-    }
-    if (index === -1) {
-      return siblings;
-    }
-  }
-
-  // refComponent(ref, componentRef) {
-  //
-  // }
-  //
-  // refElement(type, id, ref) {
-  //   if (ref) {
-  //     return this.pool._refElement.pop(type, id, ref);
-  //   }
-  //   else {
-  //     return this.pool._element.pop(type, id);
-  //   }
-  // }
-  //
-  // _refElement(type, id, ref, element) {
-  //   ref(element);
-  //   this._element(type, id, element);
-  // }
-  //
-  // _element(type, id, element) {
-  //   if (element) {
-  //     if (!lastClaimed) {
-  //       this.create(type, id, element);
-  //     }
-  //     else if (claimed) {
-  //       this.update(type, id, element);
-  //     }
-  //   }
-  //   else if (claimed) {
-  //     claimed = false;
-  //     this.elementClaims.delete(id);
-  //     this.destroy(type, id);
-  //   }
-  // }
-
   inject(node, path, root) {
     if (!node) {return node;}
 
     const isComponent = typeof node.nodeName === 'function';
-    if (typeof node.nodeName === 'function') {
-      const _ref = node.attributes && node.attributes.ref;
+    if (isComponent) {
       if (node.nodeName.prototype instanceof Component) {
-        if (_ref) {
-          return h(Trickster, null, [cloneElement(node, {
-            ref: v => {
-              _ref(v);
-              this.hook(v, path, node.nodeName.name);
-            },
-          }, node.children)]);
+        if (node.attributes && node.attributes.ref) {
+          const _ref = node.attributes && node.attributes.ref;
+          return this.cloneStateful(node, component => {
+            _ref(component);
+            this.statefulHook(component, path);
+          });
         }
         else {
-          return h(Trickster, null, [cloneElement(node, {
-            ref: v => {
-              this.hook(v, path, node.nodeName.name);
-            },
-          }, node.children)]);
+          return this.cloneStateful(node, component => {
+            this.statefulHook(component, path);
+          });
         }
       }
       else {
-        const _ref = node.ref || (() => {});
-        const ref = component => {
-          _ref(component);
-
-          const _path = path.substring(0, path.lastIndexOf('.'));
-          const _key = path.substring(path.lastIndexOf('.') + 1);
-          if (component) {
-            this.componentCreate(_path, _key, component);
-          }
-          else {
-            this.componentDestroy(_path, _key);
-          }
-        };
-
-        const clone = cloneElement(node, {ref}, node.children);
-
-        const nodeName = node.nodeName;
-        // let newName = this.statelessMap.get(nodeName);
-        // if (!newName) {
-        //   newName = (...args) => {
-        //     return this.inject(nodeName(...args), `${path}.${nodeName.name}`, true);
-        //   };
-        //   this.statelessMap.set(nodeName, newName);
-        // }
-        // clone.nodeName = newName;
-        clone.nodeName = (...args) => {
-          return this.inject(nodeName(...args), `${path}.${nodeName.name}`, true);
-        };
-
-        return clone;
+        return this.cloneStateless(node, path);
       }
     }
     else {
       const _children = node.children;
       const children = this.children(_children, path);
-      if (children !== _children) {
-        if (this.match(node.attributes && node.attributes.class || '')) {
-          const type = this.matchType();
-          const animation = this.matchAnimation();
-          const id = this.matchId();
+      if (node.attributes && node.attributes.class && this.matchNode(node)) {
+        // const type = matchType();
+        const type = this.matcher._match.type
+        // const id = this.matchId();
+        const id = this.matcher._match.id;
 
-          this.change(type, id, animation);
+        // this.change(type, id, this.matchAnimation());
+        this.change(type, id, this.matcher._match.animation);
 
+        const lastClaim = this.elementClaims[id];
+        this.elementClaims[id] = () => {refState = 2; return true;};
+        let refState = (!lastClaim || !lastClaim()) ? 0 : 1;
+
+        if (node.attributes && node.attributes.ref) {
           const _ref = node.attributes && node.attributes.ref;
-
-          const lastClaim = this.elementClaims.get(id);
-          const lastClaimed = lastClaim && lastClaim();
-
-          let claimed = true;
-          const claim = () => {claimed = false; return true;};
-          this.elementClaims.set(id, claim);
-
-          if (_ref) {
-            return cloneElement(node, {
-              ref: element => {
-                _ref(element);
-                if (element) {
-                  if (!lastClaimed) {
-                    this.create(type, id, element);
-                  }
-                  else if (claimed) {
-                    this.update(type, id, element);
-                  }
-                }
-                else if (claimed) {
-                  claimed = false;
-                  this.elementClaims.delete(id);
-                  this.destroy(type, id);
-                }
-              }
-            }, children);
-          }
-          else {
-            return cloneElement(node, {
-              ref: element => {
-                if (element) {
-                  if (!lastClaimed) {
-                    this.create(type, id, element);
-                  }
-                  else if (claimed) {
-                    this.update(type, id, element);
-                  }
-                }
-                else if (claimed) {
-                  claimed = false;
-                  this.elementClaims.delete(id);
-                  this.destroy(type, id);
-                }
-              }
-            }, children);
-          }
-        }
-        else if (children !== _children) {
-          return cloneElement(node, null, children);
+          return this.cloneElement(node, children, element => {
+            _ref(element);
+            refState = this.elementRef(refState, type, id, element);
+          });
         }
         else {
-          return node;
+          return this.cloneElement(node, children, element => {
+            refState = this.elementRef(refState, type, id, element);
+          });
         }
       }
-      else if (this.match(node.attributes && node.attributes.class || '')) {
-        const type = this.matchType();
-        const animation = this.matchAnimation();
-        const id = this.matchId();
-
-        this.change(type, id, animation);
-
-        const _ref = node.attributes && node.attributes.ref;
-
-        const lastClaim = this.elementClaims.get(id);
-        const lastClaimed = lastClaim && lastClaim();
-
-        let claimed = true;
-        const claim = () => {claimed = false; return true;};
-        this.elementClaims.set(id, claim);
-
-        if (_ref) {
-          return cloneElement(node, {
-            ref: element => {
-              _ref(element);
-              if (element) {
-                if (!lastClaimed) {
-                  this.create(type, id, element);
-                }
-                else if (claimed) {
-                  this.update(type, id, element);
-                }
-              }
-              else if (claimed) {
-                claimed = false;
-                this.elementClaims.delete(id);
-                this.destroy(type, id);
-              }
-            }
-          }, _children);
-        }
-        else {
-          return cloneElement(node, {
-            ref: element => {
-              if (element) {
-                if (!lastClaimed) {
-                  this.create(type, id, element);
-                }
-                else if (claimed) {
-                  this.update(type, id, element);
-                }
-              }
-              else if (claimed) {
-                claimed = false;
-                this.elementClaims.delete(id);
-                this.destroy(type, id);
-              }
-            }
-          }, _children);
-        }
+      else if (children !== _children) {
+        return this.cloneElement(node, children);
       }
       else {
         return node;
       }
     }
   }
+
+  cloneStateful(node, ref) {
+    const clone = new BoxartVNode();
+    clone.nodeName = node.nodeName;
+    clone.children = node.children;
+    clone.attributes = Object.assign({}, node.attributes);
+    clone.attributes.ref = ref;
+    clone.key = node.key;
+
+    const trickster = new BoxartVNode();
+    trickster.nodeName = BoxartWrap;
+    trickster.children = null;
+    trickster.attributes = {hooked: clone};
+    trickster.key = node.key;
+
+    return trickster;
+  }
+
+  statefulHook(component, path) {
+    if (component && component.render && !component.render.crawled) {
+      const componentPath = `${path}.${component.constructor.name}`;
+      const _render = component.render;
+      component.render = (props, state, context) => {
+        return this.inject(_render.call(component, props, state, context), componentPath, true);
+      };
+      component.render.crawled = true;
+    }
+  }
+
+  cloneStateless(node, _path) {
+    // const clone = cloneElement(node, null);
+    const clone = new BoxartVNode();
+
+    const path = `${_path}.${node.nodeName.name}`;
+    clone.nodeName = (a, b) => {
+      return this.statelessHook(node.nodeName, path, a, b);
+    };
+
+    clone.children = node.children;
+    clone.attributes = node.attributes;
+    clone.key = node.key;
+
+    return clone;
+  }
+
+  statelessHook(nodeName, path, a, b) {
+    return this.inject(nodeName(a, b), path, true);
+  }
+
+  cloneElement(node, children, ref) {
+    const clone = new BoxartVNode();
+
+    clone.nodeName = node.nodeName;
+    clone.children = children;
+    clone.attributes = Object.assign({}, node.attributes);
+    if (ref) {
+      clone.attributes.ref = ref;
+    }
+    clone.key = node.key;
+
+    return clone;
+  }
+
+  elementRef(refState, type, id, element) {
+    switch (refState) {
+    case 0:
+      this.create(type, id, element);
+      return 1;
+
+    case 1:
+      if (element) {
+        this.update(type, id, element);
+        return 1;
+      }
+      else {
+        this.elementClaims[id] = null;
+        this.destroy(type, id);
+        return 2;
+      }
+
+    default:
+      return 2;
+    }
+  }
 }
 
-module.exports = PreactCrawler;
+export default PreactCrawler;
