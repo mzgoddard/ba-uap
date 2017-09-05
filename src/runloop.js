@@ -12,6 +12,8 @@ const STAGES = [
   DESTROY,
 ];
 
+const MAX_DT = 0.033;
+
 export default class RunLoop {
   constructor(options = {}) {
     this.stages = {
@@ -29,41 +31,69 @@ export default class RunLoop {
       this.stages[DESTROY],
     ];
     this.cleanup = [];
+    this.scheduledCount = 0;
 
     this.last = 0;
     this.loop = this.loop.bind(this);
+    this._soonNull = this._soonNull.bind(this);
 
-    this.schedule(() => {
-      for (let [oldItem, stage] of this.cleanup) {
-        this.stages[stage].splice(
-          this.stages[stage].findIndex(item => item === oldItem),
-          1,
-        );
-      }
-      this.cleanup.length = 0;
-    }, BEFORE_ITEMS);
-
-    this.requestFrame = options.requestFrame || requestAnimationFrame;
-    this.cancelFrame = options.cancelFrame || cancelAnimationFrame;
+    this._requestFrame = options.requestFrame || requestAnimationFrame;
+    this._cancelFrame = options.cancelFrame || cancelAnimationFrame;
     this.now = options.now || Date.now;
     this.resume();
   }
 
   _request() {
     this.last = this.now();
-    this.rafId = this.requestFrame.call(null, this.loop);
+    this.requestFrame();
   }
 
   _cancel() {
-    this.cancelFrame.call(null, this.rafId);
+    this.cancelFrame();
+  }
+
+  requestFrame() {
+    if (this.scheduledCount && this.rafId === null) {
+      if (this.sleeping) {
+        this.last = this.now();
+        this.sleeping = false;
+      }
+      this.rafId = this._requestFrame.call(null, this.loop);
+    }
+    else if (this.scheduledCount === 0) {
+      this.sleeping = true;
+      this.rafId = null;
+    }
+  }
+
+  cancelFrame() {
+    this._cancelFrame.call(null, this.rafId);
+    this.sleeping = true;
+    this.rafId = null;
+  }
+
+  doCleanup() {
+    const cleanup = this.cleanup;
+    let oldItem, stage, index;
+    for (let i = 0, l = cleanup.length; i < l; ++i) {
+      oldItem = cleanup[i][0];
+      stage = cleanup[i][1];
+      index = this.stages[stage].findIndex(item => item === oldItem);
+      this.stages[stage].splice(index, 1);
+      this.scheduledCount -= 1;
+    }
+    cleanup.length = 0;
   }
 
   loop() {
-    this.rafId = this.requestFrame.call(null, this.loop);
-
     const now = this.now();
-    const dt = (now - this.last) / 1000;
+    const dt = Math.min((now - this.last) / 1000, MAX_DT);
     this.last = now;
+
+    this.doCleanup();
+
+    this.rafId = null;
+    this.requestFrame();
 
     for (let stage of this.stageOrder) {
       for (let item of stage) {
@@ -87,6 +117,8 @@ export default class RunLoop {
 
   add(item) {
     this.stages[ANIMATE].push(item);
+    this.scheduledCount += 1;
+    this.requestFrame();
   }
 
   remove(item) {
@@ -99,10 +131,14 @@ export default class RunLoop {
       fn(...args);
     };
     this.stages[stage].push(_fn);
+    this.scheduledCount += 1;
+    this.requestFrame();
   }
 
   schedule(fn, stage = BEFORE_ITEMS) {
     this.stages[stage].push(fn);
+    this.scheduledCount += 1;
+    this.requestFrame();
   }
 
   unschedule(fn, stage) {
@@ -118,11 +154,13 @@ export default class RunLoop {
     }
   }
 
+  _soonNull() {
+    this._soon = null;
+  }
+
   soon() {
-    if (!this._soon) {
-      this._soon = Promise.resolve()
-      .then(() => {this._soon = null;});
-    }
+    if (this._soon) {return this._soon;}
+    this._soon = Promise.resolve().then(this._soonNull);
     return this._soon;
   }
 }
