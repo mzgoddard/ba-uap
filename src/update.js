@@ -94,16 +94,41 @@ const update = builder(() => {
   const rectUpdate = properties({
     left: identity(),
     top: identity(),
+    right: identity(),
+    bottom: identity(),
     width: identity(),
     height: identity(),
   });
 
-  const rect = () => {
-    return byElement(element => element.getBoundingClientRect(), rectUpdate);
+  const rect = fn => {
+    if (fn) {
+      // const _rect = {
+      //   left:
+      //   top:
+      //   right:
+      //   bottom:
+      //   width:
+      //   height:
+      // }
+      return value((element, state, animated) => fn(element.getBoundingClientRect(), state, animated));
+    }
+    else {
+      return asElement(element => element.getBoundingClientRect(), rectUpdate);
+    }
+  };
+  // update.rect().asElement(object({}))
+  // update.value(element => element.getBoundingClientRect()).asElement()
+  const should = (fn, compare) => {
+    const f = _wrapPassthrough(fn);
+    f.copy = _wrapCopy(fn);
+    f.should = compare;
+    return f;
   };
 
   return {
     value,
+    property,
+    path,
     identity,
     constant,
 
@@ -111,18 +136,23 @@ const update = builder(() => {
     properties,
     elements,
 
-    byElement,
+    asElement,
 
     rect,
+
+    should,
   };
 }).freeze();
 
 export const value = update.value;
+export const property = update.property;
+export const path = update.path;
 export const identity = update.identity;
 export const object = update.object;
 export const properties = update.properties;
 export const elements = update.elements;
-export const byElement = update.byElement;
+export const asElement = asElement;
 export const rect = update.rect;
+export const should = update.should;
 
 export default update;

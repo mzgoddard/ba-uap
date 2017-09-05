@@ -198,9 +198,9 @@ const animate = builder(() => {
 
   const easing = (fn, tfn) => {
     const f = (t, state, begin, end) => {
-      return fn(tfn(t), state, begin, end);
+      return fn(tfn(t, state, begin, end), state, begin, end);
     };
-    f.eq = (t, state, begin, end) => fn.eq(tfn(t), state, begin, end);
+    f.eq = (t, state, begin, end) => fn.eq(tfn(t, state, begin, end), state, begin, end);
     f.clone = state => fn.clone(state);
     f.copy = (dest, src) => fn.copy(dest, src);
     return f;
@@ -212,35 +212,18 @@ const animate = builder(() => {
       seconds = fn;
       fn = tmp;
     }
+    const halfSeconds = seconds / 2;
+    const tfn = (t, begin) => (
+      Math.min(1, t / (seconds - (begin.tsub < halfSeconds ? begin.tsub : 0)))
+    );
     const f = (t, state, begin, end) => {
-      return fn(Math.min(1, t / seconds), state, begin, end);
+      return fn(tfn(t, begin), state, begin, end);
     };
-    f.eq = (t, state, begin, end) => fn.eq(Math.min(1, t / seconds), state, begin, end);
-    // f.eq = t => t / seconds >= 1;
+    f.eq = (t, state, begin, end) => tfn(t, begin) >= 1;
     f.clone = state => fn.clone(state);
     f.copy = (dest, src) => fn.copy(dest, src);
     return f;
   };
-
-  // const persistTime = (fn, key = 't') => {
-  //   const f = (t, state, begin, end) => {
-  //     if (state[key] && t < state[key]) {
-  //       t += state[key];
-  //       state[key] = state[key] + (t - state[key]);
-  //       state[key] = t;
-  //       return fn(state[key])
-  //     }
-  //     else if (state[key] && t > state[key]) {
-  //
-  //     }
-  //   };
-  //   f.eq = (t, state, begin, end) => {
-  //
-  //   };
-  //   f.clone = state => fn.clone(state);
-  //   f.copy = (dest, src) => fn.copy(dest, src);
-  //   return f;
-  // };
 
   return {
     at,
