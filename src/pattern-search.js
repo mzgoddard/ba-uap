@@ -25,7 +25,29 @@ class PatternSearch {
       let node = tree;
       for (let j = 0; j < p.chars.length - 1; j++) {
         const c = p.chars[j];
-        node = node[c] = node[c] || {};
+        if (c !== '*') {
+          node = node[c] = node[c] || {};
+        }
+        else {
+          const wildNode = {};
+          const wildStack = [[node, Object.keys(node), 0]];
+          while (wildStack.length) {
+            const memory = wildStack.pop();
+            node = memory[0];
+            const keys = memory[1];
+            const i = memory[2];
+            if (i < keys.length) {
+              const child = node[keys[i]];
+              wildStack.push([node, keys, i + 1]);
+              if (!child.pattern) {
+                wildStack.push([child, Object.keys(child), 0]);
+              }
+            }
+            else {
+              node = node['*'] = wildNode;
+            }
+          }
+        }
       }
       node[' '] = p;
       node['\0'] = p;
@@ -55,11 +77,21 @@ class PatternSearch {
       }
       flat[i + 1] = j;
       keys = Object.keys(node);
-      keys.sort();
+      keys.sort((a, b) => (
+        a === '*' ? 1 :
+        b === '*' ? -1 :
+          a.charCodeAt(0) - b.charCodeAt(0)
+      ));
       for (let k = 0; k < keys.length; k++) {
         const key = keys[k];
-        flat[j++] = key.charCodeAt(0);
-        flat[j++] = node[key];
+        if (key === '*') {
+          flat[j++] = -2;
+          flat[j++] = node[key];
+        }
+        else {
+          flat[j++] = key.charCodeAt(0);
+          flat[j++] = node[key];
+        }
       }
       flat[j++] = -1;
       flat[j++] = -1;
@@ -72,27 +104,38 @@ class PatternSearch {
     this._dirty = false;
   }
 
-  search(str) {
+  search(str, begin, end) {
     if (this._dirty) {
+      if (this.patterns.length === 0) {
+        return false;
+      }
       this.rebuild();
     }
 
+    this.begin = begin;
     const _str = str + '\0';
     const code = this.code;
     let ptr = 0;
-    for (let i = 0; i < _str.length; i++) {
+    for (let i = begin || 0, l = end || _str.length; i < l; ++i) {
       if (code[ptr] === _str.charCodeAt(i)) {
         if (code[ptr + 1] <= 0) {
+          this.end = i;
           return this.answers[-code[ptr + 1]];
         }
         ptr = code[ptr + 1];
       }
+      else if (code[ptr] === -2 && _str[i] !== ' ' && _str[i] !== '\0') {
+        ptr = code[ptr + 1];
+        while (i < l && _str[i] !== ' ' && _str[i] !== '\0') {++i;}
+        --i;
+      }
       else {
-        i--;
+        --i;
         ptr += 2;
         if (code[ptr] === -1) {
           ptr = 0;
-          while (++i < _str.length && _str[i] !== ' ');
+          while (++i < l && _str[i] !== ' ');
+          this.begin = i;
         }
       }
     }
