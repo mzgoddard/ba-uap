@@ -1,20 +1,10 @@
-class PreactNodeIdGenerator {
+import MatchOwner from './match-owner';
+
+class PreactNodeIdGenerator extends MatchOwner {
   constructor(matcher) {
-    this.matcher = matcher;
+    super(matcher);
     this.isElement = this.isElement.bind(this);
     this.nodeId = this.nodeId.bind(this);
-  }
-
-  match(className) {
-    return this.matcher.match(className);
-  }
-
-  matchType() {
-    return this.matcher.matchType();
-  }
-
-  matchId() {
-    return this.matcher.matchId();
   }
 
   isElement(node) {
@@ -23,8 +13,12 @@ class PreactNodeIdGenerator {
 
   nodeId(node) {
     if (typeof node.nodeName === 'string') {
-      if (this.match(node.attributes && node.attributes.class || '')) {
-        return this.matchId();
+      if (node.__boxartPreactMatchId) {
+        return node.__boxartPreactMatchId;
+      }
+      if (this.matchNode(node)) {
+        node.__boxartPreactMatchId = this.matchId();
+        return node.__boxartPreactMatchId;
       }
     }
     else {
