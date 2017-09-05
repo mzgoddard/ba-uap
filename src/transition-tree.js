@@ -2,6 +2,9 @@ import inOrderUnion from './in-order-union';
 
 class TransitionList {
   constructor(tree, path, idGen) {
+    const index = path.lastIndexOf('.');
+    this.parentPath = path.substring(0, index);
+    this.parentKey = path.substring(index + 1);
     this.path = path;
     this.tree = tree;
 
@@ -29,7 +32,6 @@ class TransitionList {
   }
 
   remove(key) {
-    // console.log('remove', key);
     if (!this.nodes[key]) {
       return;
     }
@@ -58,7 +60,6 @@ class TransitionList {
   root(key, id, node) {
     this._updateOrder();
     if (!this.nodes[id || key] || !this.nodes[key]) {
-      // console.log('root', this.path, key, id, !!this.nodes[id || key]);
       for (let i = 0; i < this.order.length; ++i) {
         this.remove(this.order[i]);
       }
@@ -72,7 +73,6 @@ class TransitionList {
 
     if (this.isElement(node) && id) {
       this.tree.setElementPath(id, this.path);
-      // console.log(this.tree.elementPaths);
     }
   }
 
@@ -89,25 +89,30 @@ class TransitionList {
   }
 
   update(src, current, missed) {
+    current.length = 0;
     missed.length = 0;
+    this._tmpOrder.length = 0;
     this.missed = missed;
     this._updateOrder();
 
     const newOrder = this._tmpOrder;
     if (src) {
       for (let i = 0; i < src.length; ++i) {
-        const id = this.nodeId(src[i]) || i;
-        // if (!id) {
-        //   if (this.order.length > 0) {
-        //     for (let j = 0; j < this.order.length; ++j) {
-        //       this.remove(this.order[j]);
-        //     }
-        //   }
-        //   this.mustAddNodes = false;
-        //   return;
-        // }
-        current[i] = id;
-        this._tmpOrder[i] = id;
+        const id = this.nodeId(src[i]);
+        if (id) {
+          current[i] = id;
+          newOrder[i] = id;
+
+          this.nodes[id] = src[i];
+          if (this.isElement(src[i])) {
+            this.tree.setElementPath(id, this.path);
+          }
+        }
+        else {
+          current[i] = i;
+          newOrder[i] = i;
+          this.nodes[i] = src[i];
+        }
       }
     }
 
@@ -126,13 +131,6 @@ class TransitionList {
       const tmp = this._tmp2Order;
       this._tmp2Order = this.order;
       this.order = tmp;
-    }
-
-    for (let i = 0; i < newOrder.length; ++i) {
-      this.nodes[newOrder[i]] = src[i];
-      if (this.isElement(src[i]) && this.nodeId(src[i])) {
-        this.tree.setElementPath(newOrder[i], this.path);
-      }
     }
   }
 
@@ -168,6 +166,9 @@ class TransitionTree {
   get(path) {
     if (!this.lists[path]) {
       this.lists[path] = new TransitionList(this, path, this.idGen);
+      if (this.lists[path]) {
+        this.lists[path].parentBranch = this.get(this.lists[path].parentPath);
+      }
     }
     return this.lists[path];
   }
@@ -177,7 +178,6 @@ class TransitionTree {
   }
 
   remove(path, root) {
-    // console.log('remove', path);
     if (this.lists[path]) {
       const branch = this.lists[path];
       const order = branch.order;
