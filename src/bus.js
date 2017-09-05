@@ -62,14 +62,14 @@ class Bus {
         };
       }
       else if (n === 3) {
+        const _all = all.values();
+        const _set = set.values();
         this.bound[s] = (x, y, z) => {
-          let values = all.values();
-          for (let i = 0, l = values.length; i < l; ++i) {
-            values[i](b, x, y, z);
+          for (let i = 0, l = _all.length; i < l;) {
+            _all[i++](b, x, y, z);
           }
-          values = set.values();
-          for (let i = 0, l = values.length; i < l; ++i) {
-            values[i](x, y, z);
+          for (let i = 0, l = _set.length; i < l;) {
+            _set[i++](x, y, z);
           }
         };
       }
