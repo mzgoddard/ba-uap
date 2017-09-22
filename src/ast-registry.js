@@ -1,7 +1,9 @@
-const compile = require('./function-ast.2step');
+const compile = require('./function-ast.auto');
 const run = require('./function-ast.vm');
-const asfunc = require('./function-ast.interactive');
+// const asfunc = require('./function-ast.interactive');
 const funcRegistry = require('./function-registry');
+
+const asfunc = compile;
 
 const create = (fn, constructor = {}) => {
   function PresentFunction(f) {
@@ -10,7 +12,7 @@ const create = (fn, constructor = {}) => {
   PresentFunction.prototype = Object.create(Function.prototype);
   PresentFunction.prototype.constructor = PresentFunction;
 
-  PresentFunction.prototype.asfunc = function() {return asfunc(this);};
+  PresentFunction.prototype.asfunc = function(options) {return asfunc(this, options);};
 
   function PresentObject(f) {
     return Object.setPrototypeOf(f, PresentObject.prototype);
@@ -41,10 +43,10 @@ const create = (fn, constructor = {}) => {
     },
     funcRegistry: {
       enumerable: false,
-      value() {
+      value(options) {
         const o = {};
         Object.entries(present).forEach(([key, value]) => {
-          o[key] = value.asfunc();
+          o[key] = value.asfunc(options);
         });
         return funcRegistry(o);
       },
