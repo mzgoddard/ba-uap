@@ -149,7 +149,13 @@ const rect = register('rect', [[]], ({
       st(r('rect'), l('height'), lo(r('_rect'), l('height'))),
       r('rect'),
     ]),
-    copy: func(['dest', 'src'], [r('src')]),
+    copy: func(['dest', 'src'], [
+      w('dest', or(r('dest'), l({}))),
+      for_of(obj, ['key', 'value'], [
+        st(r('dest'), r('key'), lo(r('src'), r('key'))),
+      ]),
+      r('dest'),
+    ]),
   })
 ));
 
