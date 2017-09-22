@@ -33,7 +33,6 @@ class Constant extends Node {
 class Expr extends Node {
   toString() {
     // console.log(this.expr);
-    // console.log(this.expr);
     return this.expr.join('');
   }
 }
@@ -510,11 +509,6 @@ const _compile_binary = ({write, compile, pointer}) => (
 
 const _compile_for_of = ({compile, pointer, context, scope, locals, names}) => {
   if (pointer.iterable.op === 'read') {
-    const _entries_name = _new_local_name(context, 'constant_entries');
-    _set_scope_name(context.stack[0] ? {scope: context.stack[0][1]} : context, 'constant_entries', _entries_name);
-    const _entries = 
-      constant(_entries_name, compile(a.call(a.l('Object.entries'), [pointer.iterable])));
-
     const i = '_for_of_index';
     const _i = _new_local_name(context, i);
     const _i_last_locals = locals[i];
@@ -534,7 +528,7 @@ const _compile_for_of = ({compile, pointer, context, scope, locals, names}) => {
     const _setupHasResult = Result.hasResult(_setup);
     const _testHasResult = Result.hasResult(_test);
     const _result = expr([
-      _entries,
+      compile(a.body([a.w('constant_entries', a.call(a.l('Object.entries'), [pointer.iterable]))])),
       resultless(expr([
         compile(a.w(len, a.lo(a.r('constant_entries'), a.l('length')))),
         token(';'),
@@ -986,10 +980,11 @@ const _compile_func = ({write, compile, pointer, context}) => {
       token('function('), ...pointer.args.map(arg => {
         const name = _get_local_name(context, arg);
         _set_scope_name(context, arg, name);
-        return name;
+        return local(name);
       }).map(_commas), token(') '),
     ]);
     let _body = compile(body);
+    _body.args = pointer.args;
 
     const {options} = context;
     const {passes = 3} = options;
@@ -1371,9 +1366,14 @@ const rules = {
   ),
 
   emulate: ast => {
+    // - track top and inner args
+    // - if an expression uses only tokens, literals, top and inner args, lift
+    //   it to a new variable and replace its use with that variable.
+
     class EmulateScopeInner {
       constructor(parent = null, depth = 0) {
         this.map = {};
+        this.args = {};
         this.parent = parent;
         this.child = null;
         this.depth = depth;
@@ -1395,9 +1395,10 @@ const rules = {
       get(name) {
         return this.map[name] ?
           this.map[name][0] :
-        this.parent ?
-          this.parent.get(name) :
           null;
+        // this.parent ?
+        //   this.parent.get(name) :
+        //   null;
       }
 
       set(name, value, parent, direction = 0) {
@@ -1416,9 +1417,41 @@ const rules = {
         }
       }
 
+      _nullAll(direction = 0) {
+        for (const name in this.map) {
+          this.map[name] = [null, this.map[name][1]];
+        }
+        if (this.parent && direction !== 1) {
+          this.parent._nullAll(-1);
+        }
+        if (this.child && direction !== -1) {
+          this.child._nullAll(1);
+        }
+      }
+
+      isArg(name) {
+        if (Boolean(this.args[name])) {
+          return true;
+        }
+        if (this.parent) {
+          return this.parent.isArg(name);
+        }
+        return false;
+      }
+
+      setArg(name) {
+        this.args[name] = true;
+      }
+
       push() {
         if (!this.child) {
           this.child = new EmulateScopeInner(this, this.depth + 1);
+        }
+        else {
+          for (const name in this.child.map) {
+            this.child.map[name][1]._read = (this.child.map[name][1]._read || 0) + 1;
+            this.child.map[name] = [null, this.child.map[name][1]];
+          }
         }
         return this.child;
       }
@@ -1430,7 +1463,7 @@ const rules = {
 
     class EmulateScope {
       constructor() {
-        this.inner = new EmulateScopeInner();
+        this.root = this.inner = new EmulateScopeInner();
       }
 
       read(name) {
@@ -1445,6 +1478,14 @@ const rules = {
         return this.inner.set(name, value, parent);
       }
 
+      isArg(name) {
+        return this.inner.isArg(name);
+      }
+
+      setArg(name) {
+        this.inner.setArg(name);
+      }
+
       push() {
         this.inner = this.inner.push();
       }
@@ -1456,6 +1497,10 @@ const rules = {
 
     let scope = new EmulateScope();
     let readScope = {};
+
+    for (let i = 0; ast.args && i < ast.args.length; i++) {
+      scope.setArg(ast.args[i]);
+    }
 
     const anyLocal = function(node) {
       if (node.name) {
@@ -1529,12 +1574,74 @@ const rules = {
       // }
     };
 
+    const _argConstant = (node, scope, tokenWhitelist) => {
+      if (!node) {
+        return false;
+      }
+      if (node.constant) {
+        return false;
+      }
+      if (
+        tokenWhitelist.indexOf(node.token) !== -1 ||
+        node.name && scope.isArg(node.name) ||
+        typeof node.value !== 'undefined' && !(node instanceof Constant) ||
+        node.name && node.name.indexOf('_arg_constant') !== -1
+      ) {
+        return true;
+      }
+      if (node.expr) {
+        for (let i = 0; i < node.expr.length; i++) {
+          if (_argConstant(node.expr[i], scope, tokenWhitelist) === false) {
+            return false;
+          }
+        }
+        return true;
+      }
+      return false;
+    };
+
+    const argConstant = (node, scope) => {
+      if (node.expr && node.expr[0].token === 'Math.min(') {
+        return _argConstant(node, scope, ['Math.min(', ', ', ')']);
+      }
+      if (node.expr && node.expr.find(n => n.token === ')(')) {
+        return _argConstant(node, scope, ['(', ')', ')(', ', ']);
+      }
+      return _argConstant(node, scope, ['(', ')', ')(']);
+    };
+
+    const count = (node, fn) => {
+      let n = 0;
+      if (fn(node)) {
+        n += 1;
+      }
+      if (node.expr) {
+        for (let i = 0; i < node.expr.length; i++) {
+          n += count(node.expr[i], fn);
+        }
+      }
+      return n;
+    };
+
+    const constants = [];
+    let nextConstant = count(ast, node => node.constant);
+
     const run = function(node, i, parent) {
+      if (!node) {return;}
       // markRead(node, i, parent);
       markRead(node, i, parent);
       if (node.expr) {
-        for (let j = 0; j < node.expr.length; j++) {
-          markRead(node.expr[j], j, node);
+        if (node.expr.find(n => n.token === 'function(')) {
+          for (let j = 0; j < node.expr.length; j++) {
+            if (node.expr[j].name) {
+              scope.setArg(node.expr[j].name);
+            }
+          }
+        }
+        else {
+          for (let j = 0; j < node.expr.length; j++) {
+            markRead(node.expr[j], j, node);
+          }
         }
       }
       // console.log(node.type, String(node));
@@ -1544,35 +1651,9 @@ const rules = {
       else if (node.token === '}') {
         scope.pop();
       }
-      // else if (node.token === 'function(') {
-      //   scope = {};
-      //   readScope = {};
-      // }
       else if (node.type === 'local') {
-        // console.log('read?', node.name, String(parent));
-        // if (readScope[node.name]) {
-        //   readScope[node.name]._read = (readScope[node.name]._read || 0) + 1;
-        // }
         if (scope.get(node.name)) {
           return lineless(scope.get(node.name));
-          // console.log('read', node.name, String(parent), String(scope[node.name][0]), parent === scope[node.name][0]);
-          // scope[node.name][1].read = (scope[node.name][1].read || 0) + 1;
-          // console.log('read', node.name, scope[node.name][1].read);
-          // if (scope[node.name][1].expr[1].token === ' = ') {
-          //   scope[node.name][1].expr =
-          //     scope[node.name][1].expr
-          //     .slice(0, 2)
-          //     .concat(local(node.name));
-          // }
-          // if (scope[node.name][1].expr[2].token === ' = ') {
-          //   scope[node.name][1].expr =
-          //     scope[node.name][1].expr
-          //     .slice(0, 3)
-          //     .concat(local(node.name));
-          // }
-          // if (scope[node.name][0]) {
-          //   return lineless(scope[node.name][0]);
-          // }
         }
         return node;
       }
@@ -1580,168 +1661,131 @@ const rules = {
         return node;
       }
       if (node.expr) {
+        if (
+          argConstant(node, scope) &&
+          count(node, n => (
+            !n.name && !n.expr
+            // typeof n.value !== 'undefined' && !n.name ||
+            // n.name && scope.isArg(n.name) && typeof n.value === 'undefined'
+          )) &&
+          count(node, n => (
+            n.name && scope.isArg(n.name)
+          ))
+        ) {
+          if (constants.find(c => String(node) === c[1])) {
+            const c = constants.find(c => String(node) === c[1]);
+            node.expr = [c[0]];
+            return c[0];
+          }
+          // console.log(count(node, n => (typeof n.value !== 'undefined' && !n.name || n.name && !scope.isArg(n.name)) && (console.log(JSON.stringify(n)), true)), String(node), JSON.stringify(node))
+          const name = local(`_arg_constant${nextConstant++}`);
+          const constant = [name, String(node), line(expr([declare(name), name, token(' = '), expr(node.expr)]))];
+          any(constant[2], node => {
+            node.constant = true;
+          });
+          constants.push(constant);
+          node.expr = [name]
+          return name;
+        }
+        else {
+          // console.log(String(node))
+        }
         // console.log('expr', node.expr.length, String(node));
-        if (node.expr[0] && node.expr[0].name && node.expr[1] && node.expr[1].token === ' = ') {
-          // let read = scope[node.expr[0].name] && scope[node.expr[0].name][1].read;
-          // console.log('1505', node.expr[0].name, node.read, node._read);
-          // if (node._read === 0) {
-          //   console.log('remove', String(node));
+        if (
+          node.expr[0] && node.expr[0].name &&
+          node.expr[1] && node.expr[1].token === ' = '
+        ) {
+          const _result = run(node.expr[2], 2, node);
+          if (scope.get(node.expr[0].name) === _result) {
+            node.expr = [];
+            return;
+          }
+          // else if (_result && node.lastRead === 1) {
+          //   if (scope.get(node.expr[0].name) === _result) {
+          //     throw new Error('setting identical value already at variable');
+          //   }
+          //   node.lastRead = node._read;
+          //   node.read = 0;
+          //   node._read = 0;
+          //   scope.set(node.expr[0].name, _result, node);
           //   node.expr = [];
-          //   // node.expr =
-          //   //   node.expr
-          //   //   .slice(0, 2)
-          //   //   .concat(local(node.expr[0].name));
-          //   return;
           // }
-          const _result = run(node.expr[2], 3, node);
-          // console.log(1458, node.expr[0].name, distinctLocals(_result), String(node.expr[2]), String(_result));
-          if (_result && distinctLocals(_result) <= 1) {
-            // console.log(
-            //   'write', node.expr[0].name,
-            //   String(node.expr[2]),
-            //   scope[node.expr[0].name] &&
-            //   // !anyLocal(scope[node.expr[0].name][0])
-            //   scope[node.expr[0].name][1].read
-            // );
-            // console.log(1468, String(scope[node.expr[0].name]), scope[node.expr[0].name] && scope[node.expr[0].name][1].read);
-            // if (
-            //   scope[node.expr[0].name] && scope[node.expr[0].name][0] && (
-            //     // !hasLocal(node.expr[0].name, _result)
-            //     // !anyLocal(_result)
-            //     // !read
-            //     false
-            //     // true
-            //   )
-            // ) {
-            //   // console.log(String(node.expr[0].name), scope[node.expr[0].name][1].read, String(_result));
-            //   if (
-            //     scope[node.expr[0].name][1].expr[1] &&
-            //     scope[node.expr[0].name][1].expr[1].token === ' = '
-            //   ) {
-            //     scope[node.expr[0].name][1].expr = [];
-            //     // scope[node.expr[0].name][1].expr =
-            //     //   scope[node.expr[0].name][1].expr
-            //     //   .slice(0, 2)
-            //     //   .concat(local(node.expr[0].name));
-            //     // console.log(1481, String(scope[node.expr[0].name][1]));
-            //   }
-            //   if (
-            //     scope[node.expr[0].name][1].expr[2] &&
-            //     scope[node.expr[0].name][1].expr[2].token === ' = '
-            //   ) {
-            //     scope[node.expr[0].name][1].expr = [];
-            //     // scope[node.expr[0].name][1].expr =
-            //     //   scope[node.expr[0].name][1].expr
-            //     //   .slice(0, 3)
-            //     //   .concat(local(node.expr[0].name));
-            //     // console.log(1488, String(scope[node.expr[0].name][1]));
-            //   }
-            // }
+          else if (_result && !hasLocal(node.expr[0].name, _result)) {
             if (scope.get(node.expr[0].name) === _result) {
               throw new Error('setting identical value already at variable');
             }
+            node.lastRead = node._read;
             node.read = 0;
             node._read = 0;
             scope.set(node.expr[0].name, _result, node);
-            // scope[node.expr[0].name] = [_result, node];
-            // readScope[node.expr[0].name] = node;
-            // console.log(1489, node.expr[0].name, String(_result));
           }
           else {
+            node.lastRead = node._read;
             node.read = 0;
             node._read = 0;
             scope.set(node.expr[0].name, null, node);
-            // scope[node.expr[0].name] = [null, node];
-            // readScope[node.expr[0].name] = node;
           }
         }
-        // node.expr.find(n => n.token === ' = ') && console.log(node.expr.findIndex(n => n.token === ' = '), String(node))
-        else if (node.expr[1] && node.expr[1].name && node.expr[2] && node.expr[2].token === ' = ') {
-          // console.log(1457, node.expr[1].name, String(node.expr[3]));
-          // let read = scope[node.expr[1].name] && scope[node.expr[1].name][1].read;
-          // console.log('1505', node.expr[1].name, node.read, node._read);
+        else if (
+          node.expr[1] && node.expr[1].name &&
+          node.expr[2] && node.expr[2].token === ' = '
+        ) {
           if (node._read === 0) {
             console.log('remove', String(node));
             node.expr = [];
-            // node.expr =
-            //   node.expr
-            //   .slice(0, 3)
-            //   .concat(local(node.expr[1].name));
             return;
           }
+
           const _result = run(node.expr[3], 3, node);
-          // console.log(1458, node.expr[1].name, distinctLocals(_result), String(node.expr[3]), String(_result));
-          if (_result && distinctLocals(_result) <= 1) {
-            // console.log(
-            //   'write', node.expr[1].name,
-            //   String(node.expr[3]),
-            //   scope[node.expr[1].name] &&
-            //   // !anyLocal(scope[node.expr[1].name][0])
-            //   scope[node.expr[1].name][1].read
-            // );
-            // console.log(1468, String(scope[node.expr[1].name]), scope[node.expr[1].name] && scope[node.expr[1].name][1].read);
-            // if (
-            //   scope[node.expr[1].name] && scope[node.expr[1].name][0] && (
-            //     // !hasLocal(node.expr[1].name, _result)
-            //     // !anyLocal(_result)
-            //     // !read
-            //     false
-            //     // true
-            //   )
-            // ) {
-            //   // console.log(String(node.expr[1].name), scope[node.expr[1].name][1].read, String(_result));
-            //   if (
-            //     scope[node.expr[1].name][1].expr[1] &&
-            //     scope[node.expr[1].name][1].expr[1].token === ' = '
-            //   ) {
-            //     scope[node.expr[1].name][1].expr = [];
-            //     // scope[node.expr[1].name][1].expr =
-            //     //   scope[node.expr[1].name][1].expr
-            //     //   .slice(0, 2)
-            //     //   .concat(local(node.expr[1].name));
-            //     // console.log(1481, String(scope[node.expr[1].name][1]));
-            //   }
-            //   if (
-            //     scope[node.expr[1].name][1].expr[2] &&
-            //     scope[node.expr[1].name][1].expr[2].token === ' = '
-            //   ) {
-            //     scope[node.expr[1].name][1].expr = [];
-            //     // scope[node.expr[1].name][1].expr =
-            //     //   scope[node.expr[1].name][1].expr
-            //     //   .slice(0, 3)
-            //     //   .concat(local(node.expr[1].name));
-            //     // console.log(1488, String(scope[node.expr[1].name][1]));
-            //   }
-            // }
+          if (scope.get(node.expr[1].name) === _result) {
+            node.expr = [];
+            return;
+          }
+          // else if (_result && node.lastRead === 1) {
+          //   if (scope.get(node.expr[1].name) === _result) {
+          //     throw new Error('setting identical value already at variable');
+          //   }
+          //   else {
+          //     node.lastRead = node._read;
+          //     node.read = 0;
+          //     node._read = 0;
+          //     scope.set(node.expr[1].name, _result, node);
+          //     node.expr = [];
+          //   }
+          // }
+          else if (_result && !hasLocal(node.expr[1].name, _result)) {
             if (scope.get(node.expr[1].name) === _result) {
               throw new Error('setting identical value already at variable');
             }
-            node.read = 0;
-            node._read = 0;
-            scope.set(node.expr[1].name, _result, node);
-            // scope[node.expr[1].name] = [_result, node];
-            // readScope[node.expr[1].name] = node;
+            else {
+              node.lastRead = node._read;
+              node.read = 0;
+              node._read = 0;
+              scope.set(node.expr[1].name, _result, node);
+            }
           }
           else {
+            node.lastRead = node._read;
             node.read = 0;
             node._read = 0;
             scope.set(node.expr[1].name, null, node);
-            // scope[node.expr[1].name] = [null, node];
-            // readScope[node.expr[1].name] = node;
           }
         }
         else if (node.expr[2] && node.expr[2].token === ' = ') {
           run(node.expr[0], 0, node);
           const _result = run(node.expr[3], 3, node);
-          if (_result && distinctLocals(_result) <= 1) {
+          // if (_result && distinctLocals(_result) <= 1) {
+          if (_result) {
             node.expr[3] = _result;
           }
         }
-        else if (node.expr.length === 3 && node.expr[0].token === '(' && node.expr[2].token === ')') {
+        else if (
+          node.expr.length === 3 &&
+          node.expr[0].token === '(' && node.expr[2].token === ')'
+        ) {
           return run(node.expr[1], 1, node);
         }
         else if (node.expr.length === 1 && node.expr[0].type === 'local') {
-          // console.log('lenght 1 local', String(node), String(parent));
           return run(node.expr[0], 0, node);
         }
         else if (node.expr.length === 1 && node.expr[0].type === 'literal') {
@@ -1753,52 +1797,27 @@ const rules = {
         else if (node.expr[2] && node.expr[2].token === ' + ') {
           let run1, run3;
           if (node.expr[1].type === 'expression') {
-            // console.log(String(node.expr[1]));
             if (node.expr[1] === node) {throw new Error('circular expression');}
             run1 = run(node.expr[1], 1, node);
             if (run1 === node) {throw new Error('returned circular expr1')}
-            // console.log(String(_result), String(node.expr[1]), node.expr[1].type);
             if (run1) {
               node.expr[1] = run1;
-              // node = expr([
-              //   node.expr[0],
-              //   run1,
-              //   node.expr[2],
-              //   node.expr[3],
-              //   node.expr[4],
-              // ]);
             }
           }
           else if (node.expr[1].type === 'local') {
             if (node.expr[1].name && scope.get(node.expr[1].name)) {
               run1 = run(node.expr[1], 1, node);
-              // console.log(1535, String(node.expr[1]), String(run1));
               if (run1 === node) {throw new Error('returned circular local1')}
-              if (run1) {
+              if (run1 && run1 !== node) {
                 node.expr[1] = run1;
-                // node = expr([
-                //   node.expr[0],
-                //   run1,
-                //   node.expr[2],
-                //   node.expr[3],
-                //   node.expr[4],
-                // ]);
               }
             }
           }
           if (node.expr[3].type === 'expression') {
-            // console.log(String(node.expr[3]));
             run3 = run(node.expr[3], 3, node);
             if (run3 === node) {throw new Error('returned circular expr3')}
             if (run3) {
               node.expr[3] = run3;
-              // node = expr([
-              //   node.expr[0],
-              //   node.expr[1],
-              //   node.expr[2],
-              //   run3,
-              //   node.expr[4],
-              // ]);
             }
           }
           else if (node.expr[3].type === 'local') {
@@ -1807,21 +1826,10 @@ const rules = {
               if (run3 === node) {throw new Error('returned circular local3')}
               if (run3) {
                 node.expr[3] = run3;
-                // node = expr([
-                //   node.expr[0],
-                //   node.expr[1],
-                //   node.expr[2],
-                //   run3,
-                //   node.expr[4],
-                // ]);
               }
             }
           }
-          // if (run1 || run3) {return node;}
-          // if (run1 || run3) {return node;}
-          // console.log(1556, String(node));
-          // run1 = run(node.expr[1], 1, node);
-          // run3 = run(node.expr[3], 3, node);
+
           if (
             node.expr[1] && node.expr[1].type === 'literal' &&
             node.expr[3] && node.expr[3].type === 'literal'
@@ -1925,13 +1933,22 @@ const rules = {
           // console.log('not declare', String(node));
           for (let i = 0; i < node.expr.length; i++) {
             // console.log(String(node.expr[i]));
-            run(node.expr[i], i, node);
+            try {
+              run(node.expr[i], i, node);
+            }
+            catch (e) {
+              console.error(String(node.expr[i]));
+              console.error(e.stack || e);
+              throw e;
+            }
           }
         }
       }
     };
 
     run(ast);
+
+    ast.expr.splice(0, 0, ...constants.map(c => c[2]));
   },
 
   // reduceLastAssignment: ast => {
