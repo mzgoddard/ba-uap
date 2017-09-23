@@ -32,7 +32,6 @@ class Constant extends Node {
 
 class Expr extends Node {
   toString() {
-    // console.log(this.expr);
     return this.expr.join('');
   }
 }
@@ -81,11 +80,9 @@ class Literal extends Node {
 class Result extends Expr {}
 
 Result.hasResult = ({expr}) => {
-  // console.log('hasResult', expr && expr.toString());
   if (!expr) {return false;}
   for (let i = expr.length - 1; i >= 0; --i) {
     if (isResult(expr[i])) {
-      // console.log('will take', expr[i].toString());
       return true;
     }
     else if (expr[i].type === 'expression') {
@@ -110,7 +107,6 @@ Result.take = _expr => {
   }
   for (let i = _expr.expr.length - 1; i >= 0; --i) {
     if (isResult(_expr.expr[i])) {
-      // console.log(_expr.expr[i].toString());
       if (_expr.expr[i] instanceof Result) {
         return resultless(expr(_expr.expr.splice(i, 1)[0].expr));
       }
@@ -138,19 +134,6 @@ Result.taken = _expr => {
   return _expr;
 };
 
-// Result.transformLast = (_expr) => {
-//   const {expr} = _expr;
-//   if (!Result.hasResult({expr})) {
-//     if (expr.length && expr[expr.length - 1].expr) {
-//       expr[expr.length - 1] = result(expr[expr.length - 1].expr);
-//     }
-//     else if (expr.length) {
-//       expr[expr.length - 1] = result([expr[expr.length - 1]]);
-//     }
-//   }
-//   return _expr;
-// };
-
 const token = str => new Token({type: 'token', token: str});
 const local = name => new Local({type: 'local', name});
 const declare = local => new Declare({type: 'declare', local});
@@ -171,7 +154,6 @@ const binary = (op, left, right) => {
     _right = Result.take(right);
   }
   if (_left !== left || _right !== right) {
-    // console.log(_left, left, _right, right);
     return expr([
       _leftTaken,
       _rightTaken,
@@ -229,19 +211,6 @@ const _compile_literal = ({compile, pointer}) => {
   if (pointer.value && pointer.value.op === 'func') {
     return compile(pointer.value);
   }
-  // else if (pointer.value && pointer.value.op === 'func') {
-  //   names._f = names._f || [];
-  //   const existing = globalVars.find(v => Object.values(v)[0] === pointer.value);
-  //   if (existing) {
-  //     write(Object.keys(existing)[0]);
-  //   }
-  //   else {
-  //     const name = `__f${names._f.length}`;
-  //     names._f.push(name);
-  //     globalVars.push({[name]: pointer.value});
-  //     write(name);
-  //   }
-  // }
   else if (typeof pointer.value === 'string') {
     return literal(JSON.stringify(pointer.value));
   }
@@ -249,12 +218,6 @@ const _compile_literal = ({compile, pointer}) => {
     const entries = Object.entries(pointer.value);
     return expr(
       [token('{')]
-      // .concat(entries.map(([key, value]) => {
-      //   return group([
-      //     token(`${key}: `),
-      //
-      //   ]);
-      // }))
       .concat([token('}')])
     );
   }
@@ -351,7 +314,6 @@ const _compile_read = ({write, compile, pointer, scope, stack}) => {
     stackIndex -= 1;
   }
   if (_scope[pointer.name] && _scope[pointer.name].op === 'literal') {
-    // console.log('read', _scope[pointer.name]);
     return compile(_scope[pointer.name]);
   }
   else {
@@ -385,7 +347,6 @@ const _compile_store = ({write, compile, pointer, stack, scope}) => {
     _deref = expr([token('['), compile(_member), token(']')]);
   }
 
-  // console.log(pointer);
   const _value = compile(pointer.value);
   let _refTaken = expr([]);
   let _refTake = _ref;
@@ -414,14 +375,11 @@ const _compile_store = ({write, compile, pointer, stack, scope}) => {
       ...(_refTaken.expr ? _refTaken.expr : [_refTaken]),
       ...(_derefTaken.expr ? _derefTaken.expr : [_derefTaken]),
       ...(_valueTaken.expr ? _valueTaken.expr : [_valueTaken]),
-      // _derefTaken,
-      // _valueTaken,
       line(lineless(result([
         _refTake,
         _derefTake,
         token(' = '),
         _valueTake,
-        // token(';'),
       ]))),
     ]);
   } 
@@ -439,7 +397,6 @@ const _compile_load = ({write, compile, pointer, stack, scope}) => {
 
   const _member = pointer.member;
   let _deref;
-  // console.log(_ref, _member);
   if (_member.op === 'literal' && _member.value === 'methods') {
     _deref = expr([]);
   }
@@ -500,7 +457,6 @@ const _compile_unary = ({write, compile, pointer}) => (
 );
 
 const _compile_binary = ({write, compile, pointer}) => (
-  // console.log(pointer.operator, pointer.left, pointer.right),
   _compile_ops[pointer.operator](
     compile(pointer.left),
     compile(pointer.right)
@@ -598,16 +554,8 @@ const _compile_for_of = ({compile, pointer, context, scope, locals, names}) => {
         scope[pointer.keys[1]] = value;
 
         const _body = compile(pointer.body);
-        // let _result;
-        // if (_body.expr) {
-        //   _result = resultless(expr(_body.expr.map(_semicolon)));
-        // }
-        // else {
-        //   _result = resultless(_semicolon(_body));
-        // }
         const _result = resultless(expr([
           compile(pointer.body),
-          // token(';'),
         ]));
 
         names[pointer.keys[0]].pop();
@@ -697,17 +645,13 @@ const _compile_branch = ({write, compile, pointer}) => {
 const _compile_body = ({write, compile, pointer}) => {
   const b = pointer.body
     .map(compile)
-    // .map(resultless)
     .filter(Boolean)
     .map(line);
-    // .map(_semicolons);
 
-  // console.log('body', 'length', b.length, b.toString());
   if (b.length === 0) {
     return expr([]);
   }
   else if (b.length === 1) {
-    // console.log('length 1', b[0].toString(), Result.hasResult(b[0]));
     if (Result.hasResult(b[0])) {
       return expr(b);
     }
@@ -716,14 +660,12 @@ const _compile_body = ({write, compile, pointer}) => {
     }
   }
   if (Result.hasResult(b[b.length - 1])) {
-    // console.log('body', 'hasResult', b[b.length - 1].toString());
     return expr([
       ...b.slice(0, b.length - 1).map(resultless),
       Result.taken(b[b.length - 1]),
       result([Result.take(b[b.length - 1])]),
     ]);
   }
-  // console.log('body', b[b.length - 1].toString(), expr(b).toString());
   return expr([
     ...b.slice(0, b.length - 1).map(resultless),
     result([b[b.length - 1]]),
@@ -731,7 +673,6 @@ const _compile_body = ({write, compile, pointer}) => {
 };
 
 const _call_search = (ref, context) => {
-  // console.log(Object.entries(ref));
   if (ref.op === 'func' || typeof ref === 'function') {
     return ref;
   }
@@ -754,7 +695,6 @@ const _call_search = (ref, context) => {
     }
   }
   else if (ref.op === 'read') {
-    // console.log('_call_search', ref);
     if (
       _compile_lookup(context.stack, context.scope, ref.name)[ref.name] &&
       _compile_lookup(context.stack, context.scope, ref.name)[ref.name].op === 'literal'
@@ -776,10 +716,8 @@ const _call_search = (ref, context) => {
   else if (ref.op === 'load') {
     let _ref = _call_search(ref.ref, context);
     if (ref.member.op === 'literal' && ref.member.value === 'methods') {
-      // return _ref.methods;
       return _ref;
     }
-    // console.log(_ref, ref.ref);
     if (_ref.op === 'methods') {
       _ref = _ref.methods;
     }
@@ -797,32 +735,6 @@ const _call_search = (ref, context) => {
     return Object.assign(a.func([], [a.l(undefined)]), {notFound: true});
   }
 };
-
-// const _call_search = (ref, context) => {
-//   if (ref.op === 'func' || typeof ref === 'function') {
-//     return ref;
-//   }
-//   else if (ref.op === 'literal') {
-//     return ref.value;
-//   }
-//   else if (ref.op === 'read') {
-//     if (context.scope[ref.name].op === 'literal') {
-//       return context.scope[ref.name].value;
-//     }
-//     else {
-//       return context.scope[ref.name];
-//     }
-//   }
-//   else if (ref.op === 'load') {
-//     return _call_search(ref.ref, context)[_call_search(ref.member, context)];
-//   }
-//   else if (ref.op === 'methods') {
-//     return ref.methods[context.func];
-//   }
-//   else {
-//     return a.func([], [a.l(undefined)]);
-//   }
-// };
 
 const _commas = (value, index, ary) => {
   if (index < ary.length - 1) {
@@ -855,10 +767,7 @@ const _semicolons = (value, index, ary) => {
 };
 
 const _compile_call = ({write, compile, pointer, context}) => {
-  // context.stack.push([context.locals, context.scope]);
-
   let func = _call_search(pointer.func, context);
-  // console.log('call', func, pointer.func);
   let _result;
   if (
     !func ||
@@ -892,7 +801,6 @@ const _compile_call = ({write, compile, pointer, context}) => {
     else {
       _func = literal(func.toString());
     }
-    // console.log(String(_func), JSON.stringify(_func), func, func && func.op, pointer.func.op);
     const _args = pointer.args.map(compile);
     const _argsTaken = [];
     const _argsTake = [];
@@ -924,7 +832,6 @@ const _compile_call = ({write, compile, pointer, context}) => {
     }
   }
   else {
-    // console.log(func);
     if (func.op === 'methods') {
       func = func.methods.main;
     }
@@ -932,10 +839,6 @@ const _compile_call = ({write, compile, pointer, context}) => {
     _result = compile(func);
     context.args = null;
   }
-
-  // const stackItem = context.stack.pop();
-  // context.locals = stackItem[0];
-  // context.scope = stackItem[1];
 
   return _result;
 };
@@ -958,14 +861,9 @@ const _pop_names = ({names}, _names) => {
   });
 };
 
-const _lift_blocks = expr => {
-  
-};
-
 const _compile_func = ({write, compile, pointer, context}) => {
   const args = context.args;
   context.args = null;
-  // console.log('func', args, JSON.stringify(pointer.body));
 
   if (!args) {
     const oldLocals = context.locals;
@@ -975,7 +873,6 @@ const _compile_func = ({write, compile, pointer, context}) => {
     _push_stack(context);
 
     const body = pointer.body;
-    // let _body;
     const _head = expr([
       token('function('), ...pointer.args.map(arg => {
         const name = _get_local_name(context, arg);
@@ -1003,7 +900,6 @@ const _compile_func = ({write, compile, pointer, context}) => {
 
     // Make one large var a, b, ... declaration
     if (declares.length) {
-      // console.log(Array.isArray(declares), String(declares));
       const oneDeclare = declares
       .filter((d, i) => (
         declares.slice(i + 1)
@@ -1053,7 +949,6 @@ const _compile_func = ({write, compile, pointer, context}) => {
       token('}'),
     ]);
 
-    // console.log(context.locals);
     _pop_names(context, Object.keys(context.locals));
     _pop_names(context, pointer.args);
     _pop_stack(context);
@@ -1064,10 +959,6 @@ const _compile_func = ({write, compile, pointer, context}) => {
   const oldScope = context.scope;
   _push_stack(context);
 
-  // console.log('func', args, JSON.stringify(pointer.body));
-  // console.log(pointer.args.length, pointer.args);
-
-  // _expr.push(token('('));
   const _args = [];
   pointer.args.forEach((name, index) => {
     let maybeCall;
@@ -1093,7 +984,6 @@ const _compile_func = ({write, compile, pointer, context}) => {
   });
 
   const _expr = compile(a.body(_args.concat(pointer.body.body)));
-  // _expr.push(token(')'));
 
   _pop_names(context, Object.keys(context.locals));
   _pop_stack(context);
@@ -1188,15 +1078,6 @@ function pop(node, fn, stack = []) {
 }
 
 const rules = {
-  // collapseExpressions: ast => (
-  //   pop(ast, node => (
-  //     !(node instanceof Line) &&
-  //     node.type === 'expression' &&
-  //     node.expr.length === 1 &&
-  //     node.expr[0]
-  //   ))
-  // ),
-
   markResults: ast => {
     ast.result = ast instanceof Result;
     any(ast, (node, i, parent, stack) => {
@@ -1286,12 +1167,6 @@ const rules = {
       node.expr.length === 1 &&
       node.expr[0] instanceof Line &&
       node.expr[0]
-    // )),
-    // pop(ast, node => (
-    //   node instanceof Line &&
-    //   node.expr.length === 1 &&
-    //   node.expr[0].expr &&
-    //   new Line({type: 'expression', expr: node.expr[0].expr})
     ))
   ),
 
@@ -1380,7 +1255,6 @@ const rules = {
       }
 
       read(name, direction = 0) {
-        // console.log('read', this.depth, name, Boolean(this.map[name] && this.map[name][1]));
         if (this.map[name] && this.map[name][1]) {
           this.map[name][1]._read = (this.map[name][1]._read || 0) + 1;
         }
@@ -1396,13 +1270,9 @@ const rules = {
         return this.map[name] ?
           this.map[name][0] :
           null;
-        // this.parent ?
-        //   this.parent.get(name) :
-        //   null;
       }
 
       set(name, value, parent, direction = 0) {
-        // console.log('set', this.depth, name, String(value));
         if (direction === 0 || this.map[name]) {
           this.map[name] = [
             value,
@@ -1549,8 +1419,6 @@ const rules = {
       return 0;
     };
 
-    // return;
-
     const markRead = function(node, i, parent) {
       if (node.name) {
         if (
@@ -1559,19 +1427,9 @@ const rules = {
             !parent.expr[i + 1]
           )
         ) {
-          // console.log(node.name, String(parent.expr[i + 1]));
-          // readScope[node.name]._read = (readScope[node.name]._read || 0) + 1;
           scope.read(node.name);
         }
-        else {
-          // console.log(String(parent[i + 1]));
-        }
       }
-      // else if (node.expr) {
-      //   for (let i = 0; i < node.expr.length; i++) {
-      //     markRead(node.expr[i], i, node);
-      //   }
-      // }
     };
 
     const _argConstant = (node, scope, tokenWhitelist) => {
@@ -1628,7 +1486,6 @@ const rules = {
 
     const run = function(node, i, parent) {
       if (!node) {return;}
-      // markRead(node, i, parent);
       markRead(node, i, parent);
       if (node.expr) {
         if (node.expr.find(n => n.token === 'function(')) {
@@ -1644,7 +1501,6 @@ const rules = {
           }
         }
       }
-      // console.log(node.type, String(node));
       if (node.token === '{') {
         scope.push();
       }
@@ -1665,8 +1521,6 @@ const rules = {
           argConstant(node, scope) &&
           count(node, n => (
             !n.name && !n.expr
-            // typeof n.value !== 'undefined' && !n.name ||
-            // n.name && scope.isArg(n.name) && typeof n.value === 'undefined'
           )) &&
           count(node, n => (
             n.name && scope.isArg(n.name)
@@ -1677,7 +1531,6 @@ const rules = {
             node.expr = [c[0]];
             return c[0];
           }
-          // console.log(count(node, n => (typeof n.value !== 'undefined' && !n.name || n.name && !scope.isArg(n.name)) && (console.log(JSON.stringify(n)), true)), String(node), JSON.stringify(node))
           const name = local(`_arg_constant${nextConstant++}`);
           const constant = [name, String(node), line(expr([declare(name), name, token(' = '), expr(node.expr)]))];
           any(constant[2], node => {
@@ -1687,10 +1540,6 @@ const rules = {
           node.expr = [name]
           return name;
         }
-        else {
-          // console.log(String(node))
-        }
-        // console.log('expr', node.expr.length, String(node));
         if (
           node.expr[0] && node.expr[0].name &&
           node.expr[1] && node.expr[1].token === ' = '
@@ -1700,16 +1549,6 @@ const rules = {
             node.expr = [];
             return;
           }
-          // else if (_result && node.lastRead === 1) {
-          //   if (scope.get(node.expr[0].name) === _result) {
-          //     throw new Error('setting identical value already at variable');
-          //   }
-          //   node.lastRead = node._read;
-          //   node.read = 0;
-          //   node._read = 0;
-          //   scope.set(node.expr[0].name, _result, node);
-          //   node.expr = [];
-          // }
           else if (_result && !hasLocal(node.expr[0].name, _result)) {
             if (scope.get(node.expr[0].name) === _result) {
               throw new Error('setting identical value already at variable');
@@ -1741,18 +1580,6 @@ const rules = {
             node.expr = [];
             return;
           }
-          // else if (_result && node.lastRead === 1) {
-          //   if (scope.get(node.expr[1].name) === _result) {
-          //     throw new Error('setting identical value already at variable');
-          //   }
-          //   else {
-          //     node.lastRead = node._read;
-          //     node.read = 0;
-          //     node._read = 0;
-          //     scope.set(node.expr[1].name, _result, node);
-          //     node.expr = [];
-          //   }
-          // }
           else if (_result && !hasLocal(node.expr[1].name, _result)) {
             if (scope.get(node.expr[1].name) === _result) {
               throw new Error('setting identical value already at variable');
@@ -1774,7 +1601,6 @@ const rules = {
         else if (node.expr[2] && node.expr[2].token === ' = ') {
           run(node.expr[0], 0, node);
           const _result = run(node.expr[3], 3, node);
-          // if (_result && distinctLocals(_result) <= 1) {
           if (_result) {
             node.expr[3] = _result;
           }
@@ -1895,44 +1721,8 @@ const rules = {
           }
           return node;
         }
-        // else if (node.expr[0] && node.expr[0].token === '(') {
-        //   return run(node.expr);
-        // }
-        // else if (node.expr.find(n => n.token === '{')) {
-        //   // console.log('curly', String(node));
-        //   let pushedReadScope = readScope;
-        //   if (node.expr.find(n => n.expr && n.expr.indexOf('function(') !== -1)) {
-        //     // readScope = Object.assign({}, pushedReadScope);
-        //     readScope = {};
-        //     // return;
-        //   }
-        //   // const curlyIndex = node.expr.findIndex(n => n.token === '{');
-        //   // markRead(expr(node.expr.slice(0, curlyIndex)), i, parent);
-        //   // console.log(String(expr(node.expr.slice(0, curlyIndex))));
-        //   const n = node.expr[curlyIndex + 1];
-        //   scope = {};
-        //   for (let i = 0; n && n.expr && i < n.expr.length; i++) {
-        //     run(n.expr[i], i, n);
-        //   }
-        //   if (node.expr.find(n => n.token === 'else ')) {
-        //     run(n.expr[0], 0, n);
-        //   }
-        //   // console.log(scope);
-        //   // Object.entries(scope).forEach(([k, v]) => {
-        //   //   console.log(k, v && v[1].read);
-        //   //   if (v && v[1].read === 0 && v[1].expr.find(n => n.type === 'declare')) {
-        //   //     v[1].expr = v[1].expr.slice(0, 3).concat(v[1].expr[1]);
-        //   //   }
-        //   // });
-        //   scope = {};
-        //   if (node.expr.find(n => n.expr && n.expr.indexOf('function(') !== -1)) {
-        //     readScope = pushedReadScope;
-        //   }
-        // }
         else if (node.type !== 'declare') {
-          // console.log('not declare', String(node));
           for (let i = 0; i < node.expr.length; i++) {
-            // console.log(String(node.expr[i]));
             try {
               run(node.expr[i], i, node);
             }
@@ -1950,81 +1740,6 @@ const rules = {
 
     ast.expr.splice(0, 0, ...constants.map(c => c[2]));
   },
-
-  // reduceLastAssignment: ast => {
-  //   pop(ast, (node, i, parent, stack) => {
-  //     if (node.stolen) {
-  //       return true;
-  //     }
-  //     if (
-  //       node.name &&
-  //       parent.expr[i - 1] && parent.expr[i - 1].token === '(' &&
-  //       parent.expr[i + 2].type === 'literal'
-  //     ) {
-  //       let lenS2 = stack.length - 2;
-  //       let index = stack[lenS2].expr.indexOf(parent);
-  //       if (stack[lenS2].expr.length === 1) {
-  //         lenS2 -= 1;
-  //         index = stack[lenS2].expr.indexOf(stack[lenS2 + 1]);
-  //       }
-  //       console.log(index, stack[lenS2].expr[index - 1] &&
-  //         stack[lenS2].expr[index - 1].token === ' = ',
-  //         stack[lenS2].expr[index - 2] && stack[lenS2].expr[index - 2].name, stack[lenS2].toString(), stack[stack.length - 3].toString());
-  //       if (
-  //         stack[lenS2].expr[index - 1] &&
-  //         stack[lenS2].expr[index - 1].token === ' = ' &&
-  //         stack[lenS2].expr[index - 2].name
-  //       ) {
-  //         let lenS3 = lenS2 - 1;
-  //         let parent2 = stack[lenS2];
-  //         let index2 = stack[lenS3].expr.indexOf(parent2);
-  //         while (stack[lenS3].expr.length === 1 && lenS3 > 1) {
-  //           lenS3 -= 1;
-  //           index2 = stack[lenS3].expr.indexOf(stack[lenS3 + 1]);
-  //         }
-  //         console.log(lenS3, index2, stack[lenS3].toString());
-  //         const lines = stack[lenS3].expr.slice(0, index2)
-  //         .filter(n => (
-  //           n.expr &&
-  //           n.expr.find(_n => _n.name === node.name) &&
-  //           n.expr.findIndex(_n => _n.token === ' = ') >
-  //             n.expr.findIndex(_n => _n.name === node.name)
-  //         ));
-  //         console.log(lines);
-  //         for (let j = lines.length - 1; j >= 0; j--) {
-  //           if (lines[j] && (
-  //             lines[j].expr[0].name === node.name ||
-  //             lines[j].expr[1].name === node.name
-  //           )) {
-  //             if (lines[j].expr[2].expr) {
-  //               if (
-  //                 lines[j].expr[2].expr[0].token === '(' &&
-  //                 lines[j].expr[2].expr[4].token === ')' &&
-  //                 lines[j].expr[2].expr[1].name === node.name &&
-  //                 lines[j].expr[2].expr[3].type === 'literal'
-  //               ) {
-  //                 lines[j].expr[2].stolen = true;
-  //                 return lines[j].expr[2];
-  //               }
-  //             }
-  //             else if (lines[j].expr[3].expr) {
-  //               if (
-  //                 lines[j].expr[3].expr[0].token === '(' &&
-  //                 lines[j].expr[3].expr[4].token === ')' &&
-  //                 lines[j].expr[3].expr[1].name === node.name &&
-  //                 lines[j].expr[3].expr[3].type === 'literal'
-  //               ) {
-  //                 lines[j].expr[3].stolen = true;
-  //                 return lines[j].expr[3];
-  //               }
-  //             }
-  //             break;
-  //           }
-  //         }
-  //       }
-  //     }
-  //   });
-  // },
 
   eliminateCanceledTerms: ast => (
     pop(ast, node => (
@@ -2112,28 +1827,6 @@ const rules = {
         }
       }
     });
-
-    // pop(ast, (node, i, parent) => (
-    //   node.type === 'expression' &&
-    //   node.expr.length === 5 &&
-    //   node.expr[2].token === ' = ' &&
-    //   node.expr[1].type === 'local' && (
-    //     node.expr[3].type === 'local' &&
-    //     pop(parent, (pnode, j, pp) => (
-    //       (pp !== parent || j > i) &&
-    //       pnode.name === node.expr[1].name &&
-    //       node.expr[3]
-    //     )) ||
-    //     node.expr[3].expr && node.expr[3].expr.length === 1 &&
-    //     node.expr[3].expr[0].type === 'local' &&
-    //     pop(parent, (pnode, j, pp) => (
-    //       (pp === parent && j > i || pp !== node) &&
-    //       pnode.name === node.expr[1].name &&
-    //       node.expr[3].expr[0]
-    //     ))
-    //   ) &&
-    //   false
-    // ))
   },
 
   removeEqualAssignments: ast => (
@@ -2144,68 +1837,14 @@ const rules = {
         node.expr[2].token === ' = ' &&
         node.expr[3].type === 'local' &&
         node.expr[1].name === node.expr[3].name ||
-        // console.log(node.toString()) ||
         node.expr.length === 3 &&
         node.expr[0].type === 'local' &&
         node.expr[1].token === ' = ' &&
         node.expr[2].type === 'local' &&
         node.expr[0].name === node.expr[2].name
-        // console.log(node.toString())
       )
     ))
   ),
-
-  // removeUnusedLocals: ast => (
-  //   // remove local assignments that are never read
-  //   pop(ast, (node, j, parent) => {
-  //     // is this an assignment?
-  //     const write =
-  //       node.type === 'expression' &&
-  //       node.expr.find(((n, i) => (
-  //         n.type === 'local' &&
-  //         node.expr[i + 1] && node.expr[i + 1].token === ' = '
-  //       )));
-  //     // if it is, is it ever read?
-  //     if (
-  //       write &&
-  //       any(ast, n => (
-  //         n.type === 'expression' &&
-  //         n.expr.find((_n, i) => (
-  //           _n.type === 'local' &&
-  //           _n.name === write.name && (
-  //             !n.expr[i + 1] ||
-  //             n.expr[i + 1] &&
-  //             n.expr[i + 1].token !== ' = '
-  //           )
-  //         ))
-  //       ))
-  //     ) {
-  //       return false;
-  //     }
-  //     else if (write) {
-  //       return true;
-  //     }
-  //     else {
-  //       return false;
-  //     }
-  //   })
-  // ),
-
-  // removeExcessiveDeclares: ast => {
-  //   ast.depth = 0;
-  //   any(ast, (node, i, parent) => {
-  //     node.depth = parent.depth + 1;
-  //   });
-  //
-  //   pop(ast, node => (
-  //     node.type === 'declare' &&
-  //     any(ast, n => (
-  //       n.type === 'declare' &&
-  //       n.local === node.local &&
-  //       n.depth < node.depth
-  //     ))
-  //   ));
-  // },
 };
 
 const ruleSets = {
@@ -2248,7 +1887,6 @@ const compile = (node, options = {}) => {
   }
 
   const context = {
-    // func,
     _body: '',
     _pointer: [],
     pointer: null,
@@ -2264,15 +1902,6 @@ const compile = (node, options = {}) => {
   context.compile = _compile.bind(null, context);
 
   const ast = context.compile(node);
-  // return ast;
-
-  // return ast;
-
-  // // pop arguments that are not used in the function
-  // const nargs = node.args.slice();
-  // while (nargs.length && !any(ast, node => node.type === 'local' && node.name === nargs[nargs.length - 1])) {
-  //   nargs.pop();
-  // }
 
   // finally, create the function
   let f;
@@ -2286,125 +1915,9 @@ const compile = (node, options = {}) => {
     throw e;
   }
 
-  // // custom toString that writes out javascript for this and attached functions
-  // if (func === 'main') {
-  //   const _f_toString = f.toString;
-  //   const _toString = (...filter) => {
-  //     return `
-  //       Object.assign(${_f_toString.call(f)}, {
-  //         ${Object.entries(f)
-  //           .filter(([k]) => k !== 'toString')
-  //           .filter(([k]) => !filter.length || filter.indexOf(k) !== -1)
-  //           .map(([k, v]) => `${k}: ${typeof v === 'object' ?
-  //             `{${Object.entries(v)
-  //               .filter(([k]) => k !== 'toString')
-  //               .map(([k, v]) => `${k}: ${v.toString()}`)
-  //               .join(',\n')}}` :
-  //               v.toString()}`)
-  //           .join(',\n')}
-  //       })
-  //     `;
-  //   };
-  //   f.toString = _toString;
-  // }
   f.toAst = () => ast;
 
   return f;
 };
 
 module.exports = compile;
-
-// const compile = gen => {
-//   const args = gen.args ?
-//     gen.args.slice(1) :
-//     Array.from(new Array(gen.length), (_, i) => a.r(String.fromCharCode(97 + i)));
-//   const node = gen(...args);
-//
-//   let body = '';
-//   const names = {};
-//   args.forEach(a => {
-//     names[a.name] = [a.name];
-//   });
-//   const globalVars = [];
-//   for (const key of Object.keys(node.methods)) {
-//     const context = {
-//       func,
-//       _body: '',
-//       _pointer: [],
-//       pointer: null,
-//       stack: [],
-//       args: [],
-//       scope: {},
-//       locals: {},
-//       names: names,
-//       globalVars: globalVars,
-//       vars: [],
-//     };
-//     context.context = context;
-//     context.write = __compile_write.bind(null, context);
-//     context.compile = _compile.bind(null, context);
-//
-//     args.forEach(a => {
-//       context.args.push(a);
-//       context.scope[a.name] = a.name;
-//     });
-//
-//     if (key === 'main') {
-//       context.write('const f = ');
-//     }
-//     else {
-//       context.write(`f.${key} = `);
-//     }
-//
-//     context.compile(node.methods[key]);
-//
-//     body += `${context._body};\n`;
-//   }
-//
-//   const vars = globalVars.reduce((carry, v) => {
-//     Object.entries(v).forEach(([key, value]) => {
-//       if (carry.findIndex(_v => _v[0] === key) === -1) {
-//         carry.push([key, value]);
-//       }
-//     });
-//     return carry;
-//   }, []);
-//
-//   let _varsBody = '';
-//   vars.forEach(([key, value]) => {
-//     _varsBody += `var ${key} = `;
-//
-//     const context = {
-//       func,
-//       _body: '',
-//       _pointer: [],
-//       pointer: null,
-//       stack: [],
-//       args: [],
-//       scope: {},
-//       locals: {},
-//       names: names,
-//       globalVars: globalVars,
-//       vars: [],
-//     };
-//     context.context = context;
-//     context.write = __compile_write.bind(null, context);
-//     context.compile = _compile.bind(null, context);
-//
-//     args.forEach(a => {
-//       context.args.push(a);
-//       context.scope[a.name] = a.name;
-//     });
-//
-//     context.compile(value);
-//     _varsBody += `${context._body};\n`;
-//   });
-//   body = _varsBody + body;
-//   body += `return f;`;
-//   const fargs = gen.args ?
-//     gen.args[0] :
-//     args.map(l => l.name);
-//   return new Function(...fargs.concat(body));
-// };
-//
-// module.exports = compile;
