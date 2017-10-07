@@ -1,9 +1,6 @@
 const compile = require('./function-ast.auto');
-const run = require('./function-ast.vm');
-// const asfunc = require('./function-ast.interactive');
 const funcRegistry = require('./function-registry');
-
-const asfunc = compile;
+const run = require('./function-ast.vm');
 
 const create = (fn, constructor = {}) => {
   function PresentFunction(f) {
@@ -12,7 +9,9 @@ const create = (fn, constructor = {}) => {
   PresentFunction.prototype = Object.create(Function.prototype);
   PresentFunction.prototype.constructor = PresentFunction;
 
-  PresentFunction.prototype.asfunc = function(options) {return asfunc(this, options);};
+  PresentFunction.prototype.asfunc = function(options) {
+    return compile(this, options);
+  };
 
   function PresentObject(f) {
     return Object.setPrototypeOf(f, PresentObject.prototype);
@@ -26,6 +25,33 @@ const create = (fn, constructor = {}) => {
   PresentObject.prototype.run = function(method, ...args) {
     return run(this, method, ...args);
   };
+
+  function bindDefinition(definition) {
+    if (definition.op !== 'func' && definition.op !== 'methods') {
+      return definition;
+    }
+    try {
+      const wrapped = Object.assign((...args) => {
+        definition._compiled = definition._compiled || compile(definition)();
+        return definition._compiled(...args);
+      }, definition, {definition});
+      if (definition.op === 'methods') {
+        if (definition.methods.main) {
+          Object.keys(definition.methods).filter(k => k !== 'main')
+          .forEach(function(key) {
+            wrapped[key] = (...args) => {
+              definition._compiled = definition._compiled ||
+                compile(definition)();
+              return definition._compiled[key](...args);
+            };
+          });
+        }
+      }
+      return wrapped;
+    } catch(e) {
+      return definition;
+    }
+  }
 
   const registry = {};
   const present = Object.create(constructor);
@@ -71,7 +97,7 @@ const create = (fn, constructor = {}) => {
               Object.setPrototypeOf(a, Object.prototype);
             }
           });
-          return new PresentObject(fn.call(this, ...args));
+          return new PresentObject(bindDefinition(fn.call(this, ...args)));
         });
         present[key].args = args;
         PresentFunction.prototype[key] = new PresentFunction(function(...args) {
@@ -80,7 +106,7 @@ const create = (fn, constructor = {}) => {
               Object.setPrototypeOf(a, Object.prototype);
             }
           });
-          return new PresentObject(fn.call(this, this, ...args));
+          return new PresentObject(bindDefinition(fn.call(this, this, ...args)));
         });
         PresentFunction.prototype.args = args;
         PresentObject.prototype[key] = new PresentFunction(function(...args) {
@@ -89,7 +115,7 @@ const create = (fn, constructor = {}) => {
               Object.setPrototypeOf(a, Object.prototype);
             }
           });
-          return new PresentObject(fn.call(this, this, ...args));
+          return new PresentObject(bindDefinition(fn.call(this, this, ...args)));
         });
         return present[key];
       },

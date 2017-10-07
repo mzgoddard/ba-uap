@@ -1877,7 +1877,7 @@ const compile = (node, options = {}) => {
   // given a function generator. call it with the stated arguments and compile
   // of a function that will generate a function that works the same as a fully
   // declared and inline-able function.
-  if (typeof node === 'function') {
+  if (typeof node === 'function' && !node.op) {
     node = a.func(node.args[0], [
       node(...node.args.slice(1)),
     ]);
