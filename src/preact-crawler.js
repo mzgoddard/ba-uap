@@ -1,15 +1,18 @@
 import {cloneElement, Component, h} from 'preact';
+import {VNode} from 'preact/src/vnode';
 
 import MatchOwner from './match-owner';
 
 const noop = () => {};
 
-const BoxartVNode = function BoxartVNode() {};
+// const BoxartVNode = function BoxartVNode() {};
+const BoxartVNode = VNode;
 
 // Wrap vdom of stateful Component extending classes with this to trigger ref
 // being called before the component first renders. This way the component will
 // be hooked before that happens.
 const BoxartWrap = function BoxartWrap({hooked}) {
+  // console.log(hooked.key);
   return hooked;
 };
 
@@ -27,6 +30,8 @@ class PreactCrawler extends MatchOwner {
     this.componentDestroy = bus.bind('component:destroy', 2);
 
     this.elementClaims = {};
+
+    this.statelessMap = new WeakMap();
   }
 
   children(_children, path) {
@@ -56,6 +61,7 @@ class PreactCrawler extends MatchOwner {
     const isComponent = typeof node.nodeName === 'function';
     if (isComponent) {
       if (node.nodeName.prototype instanceof Component) {
+        // console.log(node.nodeName.name, 'Component');
         if (node.attributes && node.attributes.ref) {
           const _ref = node.attributes && node.attributes.ref;
           return this.cloneStateful(node, component => {
@@ -122,7 +128,13 @@ class PreactCrawler extends MatchOwner {
     const trickster = new BoxartVNode();
     trickster.nodeName = BoxartWrap;
     trickster.children = null;
-    trickster.attributes = {hooked: clone};
+    trickster.attributes = {
+      key: node.key,
+      hooked: clone,
+      // Easier to debug if you can see the wrapped nodeName quicker in React
+      // Tools.
+      nodeName: node.nodeName,
+    };
     trickster.key = node.key;
 
     return trickster;
@@ -144,12 +156,21 @@ class PreactCrawler extends MatchOwner {
     const clone = new BoxartVNode();
 
     const path = `${_path}.${node.nodeName.name}`;
-    clone.nodeName = (a, b) => {
-      return this.statelessHook(node.nodeName, path, a, b);
-    };
+    clone.nodeName = this.statelessMap.get(node.nodeName);
+    if (!clone.nodeName) {
+      const PreactCrawlStateless = ({props, nodeName, path}, context) => {
+        return this.statelessHook(nodeName, path, props, context);
+      };
+      clone.nodeName = PreactCrawlStateless;
+      this.statelessMap.set(node.nodeName, PreactCrawlStateless);
+    }
 
     clone.children = node.children;
-    clone.attributes = node.attributes;
+    clone.attributes = {
+      props: node.attributes,
+      nodeName: node.nodeName,
+      path,
+    };
     clone.key = node.key;
 
     return clone;
