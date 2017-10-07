@@ -26,6 +26,7 @@ module.exports = {
     'preact-auto-transition': './preact-auto-transition',
     'preact-auto-transition-live': './preact-auto-transition-live',
     'preact-ref-test': './preact-ref-test',
+    '2048-1': './2048-1',
   },
   output: {
     path: dir('../dist'),
@@ -41,7 +42,14 @@ module.exports = {
     rules: [
       {
         test: /\.js$/,
-        exclude: [dir('../node_modules'), dir('preact-transition'), dir('preact-ref-test'), dir('preact-auto-transition'), dir('preact-auto-transition-live')],
+        exclude: [
+          dir('../node_modules'),
+          dir('preact-transition'),
+          dir('preact-ref-test'),
+          dir('preact-auto-transition'),
+          dir('preact-auto-transition-live'),
+          dir('2048-1'),
+        ],
         loader: 'babel-loader',
         options: {
           presets: [
@@ -55,7 +63,13 @@ module.exports = {
       },
       {
         test: /\.js$/,
-        include: [dir('preact-transition'), dir('preact-ref-test'), dir('preact-auto-transition'), dir('preact-auto-transition-live')],
+        include: [
+          dir('preact-transition'),
+          dir('preact-ref-test'),
+          dir('preact-auto-transition'),
+          dir('preact-auto-transition-live'),
+          dir('2048-1'),
+        ],
         exclude: [dir('../node_modules')],
         loader: 'babel-loader',
         options: {
@@ -79,6 +93,12 @@ module.exports = {
     ],
   },
   plugins: [
+    new (require('../src2/webpack/function-compile-plugin'))(),
+    new webpack.DefinePlugin({
+      process: {env: {
+        // BOXART_ENV: '"generated"',
+      }},
+    }),
     new webpack.optimize.CommonsChunkPlugin({
       name: 'vendor',
       filename: 'vendor.js',
@@ -87,11 +107,11 @@ module.exports = {
       template: './index.html.js',
       chunks: [],
     }),
-    new HardSourceWebpackPlugin({
-      cacheDirectory: dir('../node_modules/.cache/hard-source/[confighash]'),
-      recordsPath: dir('../node_modules/.cache/hard-source/[confighash]/records.json'),
-      configHash: require('node-object-hash')().hash,
-    }),
+    // new HardSourceWebpackPlugin({
+    //   cacheDirectory: dir('../node_modules/.cache/hard-source/[confighash]'),
+    //   recordsPath: dir('../node_modules/.cache/hard-source/[confighash]/records.json'),
+    //   configHash: require('node-object-hash')().hash,
+    // }),
   ].concat([
     'moving-box',
     'many-boxes',
@@ -102,6 +122,7 @@ module.exports = {
     'preact-auto-transition',
     'preact-auto-transition-live',
     'preact-ref-test',
+    '2048-1',
   ].map(name => new HtmlWebpackPlugin({
     filename: `${name}/index.html`,
     template: `./${name}/index.html.js`,

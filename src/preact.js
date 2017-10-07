@@ -64,4 +64,6 @@ export {
   animate,
   present,
   update,
+
+  RunLoop,
 };

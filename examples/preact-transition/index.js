@@ -62,11 +62,11 @@ const defaultAnimation = {
 }
 
 const Page1 = ({icons, shuffle, select}) => (
-  <div>
+  <div style={{position: 'absolute', top: 0, left: 0}}>
     <div>
       <button onClick={shuffle}>Shuffle</button>
     </div>
-    <div>
+    <div style={{width: "250px"}}>
       {icons.map(([key, icon]) => (
         <Transition key={key} animatedKey={key} animations={{
           // enter: defaultAnimation,
@@ -80,7 +80,7 @@ const Page1 = ({icons, shuffle, select}) => (
 );
 
 const Page2 = ({icon, src, close}) => (
-  <div>
+  <div style={{position: 'absolute', top: 0, left: 0}}>
     <button onClick={close}>Close</button>
     <Transition animatedKey={icon} animations={{
       default: defaultAnimation,
@@ -110,12 +110,13 @@ class Root extends Component {
   constructor() {
     super();
 
-    this.icons = {
-      discord: icons('./discord.svg'),
-      docker: icons('./docker.svg'),
-    };
+    this.icons = {};
+    icons.keys().forEach(key => {
+      this.icons[/\w+/.exec(key)[0]] = icons(key);
+    });
+
     this.state = {
-      icons: Object.keys(this.icons),
+      icons: Object.keys(this.icons).slice(0, 10),
       pageId: 1,
       detailIcon: null,
     };
@@ -139,15 +140,15 @@ class Root extends Component {
     else {
       page = <Transition key={`page${this.state.pageId}`} animatedKey="page1" animations={{
         appear: fadeInAnimation,
-        enter: fadeInAnimation,
-        leave: fadeOutAnimation,
+        // enter: fadeInAnimation,
+        // leave: fadeOutAnimation,
         default: pageDefaultAnimation,
       }}>
         <Page1
           icons={this.state.icons.map(icon => ([icon, this.icons[icon]]))}
           shuffle={() => {
             const icons = this.state.icons.slice();
-            icons.sort(() => Math.random());
+            icons.sort(() => (Math.random() * 2) | 0);
             this.setState({
               icons,
             });
