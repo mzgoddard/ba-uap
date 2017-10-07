@@ -348,7 +348,15 @@ class AnimatedState {
       // this._resolve();
       this.transitionStep(TransitionInput.Done);
     }
-    this.animation.present(this.animated.root.element, this.data.state, this.data);
+    if (this.stored) {
+      this.animation.present(this.animated.root.element, this.data.state, this.data);
+      // console.log(this.animation.present({style:{}}, this.data.state, this.data));
+      // console.log(this.animated.root.element.style.visibility);
+    }
+    // console.log('present');
+    // console.log(this.data.t, this.animated.root.element.style.transform);
+    // console.log(this.animated.root.element.style.transform);
+    // console.log(JSON.stringify(this.data.state));
   }
 
   schedule(animated, loop) {
