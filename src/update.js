@@ -18,6 +18,7 @@ const update = builder(() => {
     return f;
   };
 
+  const property = key => value(element => element[key]);
   const identity = () => value(element => element);
   const constant = c => value(() => c);
 
@@ -113,14 +114,16 @@ const update = builder(() => {
       return value((element, state, animated) => fn(element.getBoundingClientRect(), state, animated));
     }
     else {
-      return asElement(element => element.getBoundingClientRect(), rectUpdate);
+      return byElement(element => element.getBoundingClientRect(), rectUpdate);
     }
   };
   // update.rect().asElement(object({}))
   // update.value(element => element.getBoundingClientRect()).asElement()
   const should = (fn, compare) => {
-    const f = _wrapPassthrough(fn);
-    f.copy = _wrapCopy(fn);
+    const f = (element, state, animated) => {
+      return fn (element, state, animated);
+    };
+    f.copy = fn.copy || function(state, element) {return element;};
     f.should = compare;
     return f;
   };
@@ -137,6 +140,7 @@ const update = builder(() => {
     elements,
 
     asElement,
+    byElement,
 
     rect,
 

@@ -122,8 +122,17 @@ const asElement = register('asElement', [['a', 'b'], base.r('a'), base.r('b')], 
   })
 ));
 
+const rectCopyObj = {
+  left: identity(),
+  top: identity(),
+  right: identity(),
+  bottom: identity(),
+  width: identity(),
+  height: identity(),
+};
+
 const rect = register('rect', [[]], ({
-  methods, func, w, call, lo, r, l, st, add, or
+  methods, func, w, call, lo, r, l, st, add, or, for_of
 }) => () => (
   methods({
     main: func(['element', 'state'], [
@@ -151,7 +160,7 @@ const rect = register('rect', [[]], ({
     ]),
     copy: func(['dest', 'src'], [
       w('dest', or(r('dest'), l({}))),
-      for_of(obj, ['key', 'value'], [
+      for_of(rectCopyObj, ['key', 'value'], [
         st(r('dest'), r('key'), lo(r('src'), r('key'))),
       ]),
       r('dest'),

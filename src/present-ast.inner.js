@@ -47,7 +47,10 @@ const suffix = ast.context(({
   func, add, call, l, r, or, lo,
 }) => (fn, suffix) => (
   value(func(['state', 'animated'], [
-    add(call(or(lo(l(fn), l('value')), l(fn)), [r('state'), r('animated')]), l(suffix))
+    add(
+      call(or(lo(l(fn), l('value')), l(fn)), [r('state'), r('animated')]),
+      l(suffix)
+    )
   ]))
 ));
 suffix.args = suffixArgs;
