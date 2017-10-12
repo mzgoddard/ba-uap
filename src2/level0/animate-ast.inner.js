@@ -221,6 +221,186 @@ const to = ast.context(() => (
 ));
 to.args = toArgs;
 
+// const keyframesSum = _frames => {
+//   if (Array.isArray(_frames)) {
+//
+//   }
+//   else {
+//     let sum = 0;
+//     return frames => {
+//       if (sum === 0) {
+//
+//       }
+//       return sum;
+//     };
+//   }
+// };
+
+const keyframesArgs = [['frames'], r('frames')];
+const keyframes = ast.context(({
+  methods, func, w, r, l, for_of, lo, sub, add, branch, call, not_last, lt, gte,
+  lte, min, max, gt, and, or, mul,
+}) => frames => (
+  methods({
+    main: func(['t', 'state', 'begin', 'end'], [
+      // let sum = frames.reduce((a, b) => a + b.t(), 0);
+      w('sum', call(l(func(['frames'], [
+        w('s', l(0)),
+        for_of(frames, ['_', 'value'], [
+          w('s', add(r('s'), call(lo(r('value'), l('t')), []))),
+        ]),
+        r('s'),
+      ])), [r('frames')])),
+      // let out = state;
+      w('out', r('state')),
+      // let _t = Math.max(Math.min(t * sum), 1), 0);
+      w('t', max(min(mul(r('t'), r('sum')), l(1)), l(0))),
+      // for (let [_, value] of Object.entries(frames)) {
+      for_of(frames, ['_', 'value'], [
+        // if (i > 0 && t < 0) {
+        branch(and(gt(r('_for_of_index'), l(0)), lte(r('t'), l(0))), [
+          // out = frames[i - 1].a(value, frames[i - 1].t() + t, state, begin, end);
+          w('out', call(lo(lo(l(frames), sub(r('_for_of_index'), l(1))), l('a')), [
+            l(r('value')),
+            add(r('t'), call(lo(lo(l(frames), sub(r('_for_of_index'), l(1))), l('t')), [])),
+            r('state'),
+            r('begin'),
+            r('end'),
+          ])),
+          // _t += Infinity;
+          w('t', add(r('t'), l(Infinity))),
+        ], [
+          // t -= value.t();
+          w('t', sub(r('t'), call(lo(r('value'), l('t')), []))),
+        ]),
+      ]),
+      // Hack around over-aggressive optimization that would get rid of some _t
+      // assignments.
+      branch(r('t'), []),
+      // return out;
+      r('out'),
+    ]),
+    a: func(['a', 't', 'state', 'begin', 'end'], [
+      w('sum', call(l(func(['frames'], [
+        w('s', l(0)),
+        for_of(frames, ['_', 'value'], [
+          w('s', add(r('s'), call(lo(r('value'), l('t')), []))),
+        ]),
+        r('s'),
+      ])), [r('frames')])),
+      w('out', r('state')),
+      w('t', max(min(mul(r('t'), r('sum')), l(1)), l(0))),
+      for_of(frames, ['_', 'value'], [
+        w('t', sub(r('t'), call(lo(r('value'), l('t')), []))),
+        branch(lte(r('t'), l(0)), [
+          w('out', call(lo(r('value'), l('a')), [
+            or(
+              lo(l(frames), add(r('_for_of_index'), l(1))),
+              r('a')
+            ),
+            add(r('t'), call(lo(r('value'), l('t')), [])),
+            r('state'),
+            r('begin'),
+            r('end'),
+          ])),
+          w('t', add(r('t'), l(Infinity))),
+        ]),
+      ]),
+      branch(r('t'), []),
+      r('out'),
+    ]),
+    eq: func(['t', 'state', 'begin', 'end'], [
+      gte(r('t'), l(1)),
+    ]),
+  })
+));
+keyframes.args = keyframesArgs;
+
+const frameArgs = [['timer', 'fn'], r('timer'), r('fn')];
+const frame = ast.context(({
+  methods, func, call, l, r, lo,
+}) => (timer, fn) => (
+  methods({
+    main: func(['t', 'state', 'begin', 'end'], [
+      call(l(fn), [
+        call(l(timer), [r('t')]),
+        r('state'),
+        r('begin'),
+        r('end'),
+      ]),
+    ]),
+    a: func(['a', 't', 'state', 'begin', 'end'], [
+      call(lo(l(fn), l('a')), [
+        r('a'),
+        call(l(timer), [r('t')]),
+        r('state'),
+        r('begin'),
+        r('end'),
+      ]),
+    ]),
+    t: func([], [
+      call(lo(l(timer), l('t')), []),
+    ]),
+    eq: func(['t', 'state', 'begin', 'end'], [
+      call(lo(l(fn), l('eq')), [
+        call(l(timer), [r('t')]),
+        r('state'),
+        r('begin'),
+        r('end'),
+      ]),
+    ]),
+  })
+));
+frame.args = frameArgs;
+
+const secondsArgs = [['seconds', 'fn'], r('seconds'), r('fn')];
+const seconds = ast.context(({
+  methods, func, div, r, l,
+}) => (seconds, fn) => (
+  frame(methods({
+    main: func(['t'], [
+      div(r('t'), l(seconds)),
+    ]),
+    t: func([], [l(seconds)]),
+  }), fn)
+));
+seconds.args = secondsArgs;
+
+const msArgs = [['ms', 'fn'], r('ms'), r('fn')];
+const ms = ast.context(({
+  methods, func, div, r, l, w,
+}) => (ms, fn) => (
+  frame(methods({
+    main: func(['t'], [
+      w('denom', div(l(ms), l(1000))),
+      div(r('t'), r('denom')),
+    ]),
+    t: func([], [div(l(ms), l(1000))]),
+  }), fn)
+));
+ms.args = msArgs;
+
+const percentArgs = [['percent', 'fn'], r('percent'), r('fn')];
+const percent = ast.context(({
+  methods, func, div, r, l, w,
+}) => (percent, fn) => (
+  frame(methods({
+    main: func(['t'], [
+      w('denom', div(l(percent), l(100))),
+      div(r('t'), r('denom')),
+    ]),
+    t: func([], [div(l(percent), l(100))]),
+  }), fn)
+));
+percent.args = percentArgs;
+
+const keyframes_exampleArgs = [[]];
+const keyframes_example = () => duration(keyframes([
+  seconds(0.999, constant(0)),
+  seconds(0.001, constant(1)),
+]), 1);
+keyframes_example.args = keyframes_exampleArgs;
+
 module.exports = {
   value,
   lerp,
@@ -233,4 +413,10 @@ module.exports = {
   easing,
   duration,
   to,
+  keyframes,
+  frame,
+  seconds,
+  ms,
+  percent,
+  keyframes_example,
 };

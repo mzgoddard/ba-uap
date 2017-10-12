@@ -252,10 +252,17 @@ const properties = ast.context(({
     ]),
     restore: func(['element', 'state', 'animated'], [
       for_of(o, ['key', 'value'], [
-        st(r('element'), r('key'), call(
-          lo(r('value'), l('restore')),
-          [lo(r('element'), r('key')), lo(r('state'), r('key')), r('animated')],
-        )),
+        branch(lo(r('value'), l('_value')), [
+          st(r('element'), r('key'), call(
+            lo(r('value'), l('restore')),
+            [lo(r('element'), r('key')), lo(r('state'), r('key')), r('animated')],
+          )),
+        ], [
+          call(
+            lo(r('value'), l('restore')),
+            [lo(r('element'), r('key')), lo(r('state'), r('key')), r('animated')],
+          ),
+        ]),
       ]),
       r('element'),
     ]),

@@ -91,10 +91,10 @@ const animate = builder(() => {
     const lastFrame = frames[frames.length - 1];
     const f = (t, state, begin, end) => {
       let i = 0;
-      for (; i < frames.length; i++) {
+      for (; i < frames.length - 1; i++) {
         t -= frames[i].timer.t;
         if (t < 0) {
-          return frames[i](frames[i].timer.t + t, state, begin, end);
+          return frames[i].a(frames[i + 1], frames[i].timer.t + t, state, begin, end);
         }
       }
       return lastFrame(lastFrame.timer.t, state, begin, end);

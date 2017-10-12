@@ -124,14 +124,16 @@ properties.args = propertiesArgs;
 
 const asElementArgs = [['a', 'b'], r('a'), r('b')];
 const asElement = ast.context(({
-  methods, func, call, l, r
+  methods, func, call, l, r, lo,
 }) => (a, b) => (
   methods({
     main: func(['element', 'state', 'animated'], [
       // b(a(element, state, animated), state, animated)
       call(l(b), [call(l(a), [r('element'), r('state'), r('animated')]), r('state'), r('animated')]),
     ]),
-    copy: b.copy || b.methods && b.methods.copy || func(['dest', 'src'], [r('src')]),
+    copy: func(['dest', 'src'], [
+      call(lo(l(b), l('copy')), [r('dest'), r('src')]),
+    ]),
   })
 ));
 asElement.args = asElementArgs;
