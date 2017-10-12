@@ -1,4 +1,3 @@
-module.exports = (function() {
 const updateNoop = (element, state) => state;
 updateNoop.copy = dest => dest;
 const animateNoop = () => {};
@@ -35,11 +34,11 @@ const UNSCHEDULE = 2;
 const START = 3;
 const DONE = 4;
 
-
+const __INIT__ = '__init__';
 
 class AnimatedState {
   constructor(animations) {
-    this.state = '__init__';
+    this.state = __INIT__;
     this.transitionState = EMPTY;
     this.animation = null;
     this.animations = animations;
@@ -62,16 +61,17 @@ class AnimatedState {
     return this.state;
   }
 
-  set(state) {
+  set(state, order, resolve = noop) {
     this.state = state;
     this.transitionStep(PREPARE);
+    // Set resolve after stepping the transitionState. Stepping may call the
+    // last set resolve method to signal to another object that its state
+    // transition completed in some fashion.
+    this.resolve = resolve;
   }
 
   setThen(state) {
-    return new Promise(function(resolve) {
-      this.set(state);
-      this.resolve = resolve;
-    });
+    return new Promise(resolve => this.set(state, null, resolve));
   }
 
   schedule(animated, loop) {
@@ -81,8 +81,8 @@ class AnimatedState {
   }
 
   unschedule() {
-    this.data.animated = null;
     this.transitionStep(UNSCHEDULE);
+    this.data.animated = null;
   }
 
   startSoon(state = WAIT_FOR_FRAME) {
@@ -92,7 +92,6 @@ class AnimatedState {
   }
 
   transitionStep(input) {
-    console.log('transitionStep', this.transitionState, this.get(), input);
     switch (this.transitionState) {
     case STARTING:
     case WAIT_FOR_FRAME:
@@ -101,16 +100,24 @@ class AnimatedState {
         const state = this.get() || 'default';
         const defaultAnimation = this.animations.default || noopAnimation;
         const animation = this.animations[state] || defaultAnimation;
-        this.animation.update = animation.update || defaultAnimation.update || updateNoop;
-        this.animation.animate = animation.animate || defaultAnimation.animate || animateNoop;
-        this.animation.present = animation.present || defaultAnimation.present || presentNoop;
+        this.animation.update = animation.update ||
+          defaultAnimation.update || updateNoop;
+        this.animation.animate = animation.animate ||
+          defaultAnimation.animate || animateNoop;
+        this.animation.present = animation.present ||
+          defaultAnimation.present || presentNoop;
 
-        this.data.end = this.animation.update(this.data.animated.root.element, this.data.end, this.data);
+        const {data} = this;
+        const {root} = data.animated;
+        const {update, present} = this.animation;
+        data.lastT = data.t;
+        data.t = 0;
+        data.end = update(root.element, data.end, data);
         if (this.transitionState === STARTING) {
-          this.data.state = this.animation.update.copy(this.data.state, this.data.end);
-          this.data.begin = this.animation.update.copy(this.data.begin, this.data.end);
+          data.state = update.copy(data.state, data.end);
+          data.begin = update.copy(data.begin, data.end);
         }
-        this.data.store = this.animation.present.store(this.data.store, this.data.animated.root.element, this.data);
+        data.store = present.store(data.store, root.element, data);
         this.loop.add(this);
         this.transitionState = RUNNING;
         return;
@@ -222,18 +229,16 @@ class AnimatedState {
   step(dt) {
     if (this.transitionState !== RUNNING) {return;}
     const {data} = this;
-    const {animate} = this.animation;
+    const {animate, present} = this.animation;
     data.t += dt;
-    console.log(data.t, this.get());
     animate(data.t, data.state, data.begin, data.end);
     if (animate.eq && animate.eq(data.t, data.state, data.begin, data.end)) {
       this.transitionStep(DONE);
     }
-    this.animation.present(data.animated.root.element, data.state, data);
+    else {
+      present(data.animated.root.element, data.state, data);
+    }
   }
 }
 
-return AnimatedState;
-})();
-
-// export default AnimatedState;
+export default AnimatedState;
