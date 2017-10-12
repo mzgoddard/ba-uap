@@ -1,5 +1,5 @@
-import AnimatedState from './animated-state';
-import {ORDER} from './state';
+import AnimatedState from './animated-state.new';
+// import {ORDER} from './state';
 
 class ScheduleInfo {
   constructor() {
@@ -109,7 +109,8 @@ class AnimatedManager {
 
     this.states[id].set(
       state || 'default',
-      ORDER.IMMEDIATE,
+      // ORDER.IMMEDIATE,
+      null,
       popEnd(this.stateEnd, type, id, state).emit
     );
 

@@ -1,4 +1,5 @@
-import AnimatedState from './animated-state';
+// import AnimatedState from './animated-state';
+import AnimatedState from '../src2/level1/animated-state.new';
 import {ORDER} from './state';
 
 class ScheduleInfo {
