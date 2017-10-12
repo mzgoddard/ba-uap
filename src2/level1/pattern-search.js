@@ -13,6 +13,8 @@ class PatternSearch {
     });
 
     this._dirty = true;
+
+    return this;
   }
 
   rebuild() {
