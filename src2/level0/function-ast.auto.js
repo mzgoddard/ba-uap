@@ -831,7 +831,7 @@ const _call_search = (ref, context) => {
     //   ),
     //   true
     // ) &&
-    (ref.member.op === 'literal' && console.log(_call_search(ref.ref, context), _call_search(ref.member, context)), true) &&
+    // (ref.member.op === 'literal' && console.log(_call_search(ref.ref, context), _call_search(ref.member, context)), true) &&
     (
       ref.member.op === 'literal' ||
       typeof _call_search(ref.member, context) === 'number' ||
