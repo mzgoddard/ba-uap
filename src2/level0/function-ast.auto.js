@@ -32,7 +32,13 @@ class Constant extends Node {
 
 class Expr extends Node {
   toString() {
-    return this.expr.join('');
+    try {
+      return this.expr.join('');
+    }
+    catch(e) {
+      console.log(this.expr);
+      throw e;
+    }
   }
 }
 
