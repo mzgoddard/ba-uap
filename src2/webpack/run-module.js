@@ -9,13 +9,13 @@ function wrapModule(code) {
 
 function callModule(fn, filename) {
   const module = {exports: {}};
-  fn(module.exports, Object.assign(function(modulename) {
+  fn.call(module.exports, module.exports, Object.assign(function(modulename) {
     if (/\W/.test(modulename[0])) {
       return require(path.join(path.dirname(filename), modulename));
     }
     return require(modulename);
   }, require), module, filename, path.dirname(filename));
-  return module.exports;
+  return module;
 }
 
 module.exports = function(source, resource) {

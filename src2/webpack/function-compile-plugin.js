@@ -1,5 +1,6 @@
 const {basename} = require('path');
 
+const LibraryTemplatePlugin = require("webpack/lib/LibraryTemplatePlugin");
 const SingleEntryPlugin = require('webpack/lib/SingleEntryPlugin');
 const webpack = require('webpack');
 
@@ -14,9 +15,7 @@ class FunctionCompilePlugin {
 
     let i = 0;
     compiler.plugin('this-compilation', function(compilation, {normalModuleFactory}) {
-      // console.log('compilation');
       compilation.plugin('normal-module-loader', function(loaderContext) {
-        // console.log('normal-module-loader', i++);
         loaderContext._inBoxartFunction = false;
         loaderContext.compileBoxartFunction = function(resource, cb) {
           let childCompilation;
@@ -24,8 +23,10 @@ class FunctionCompilePlugin {
           const compilerName = basename(resource);
           const child = compilation.createChildCompiler(compilerName, {
             filename: '[name].js',
-            libraryTarget: 'commonjs2',
           }, [
+            new LibraryTemplatePlugin(
+              'jsonpFunction', 'jsonp', false, '', null,
+            ),
             {
               apply(childCompiler) {
                 childCompiler.plugin('this-compilation', function(compilation) {
@@ -64,14 +65,9 @@ class FunctionCompilePlugin {
               },
             },
           ]);
+
+          // webpack bug workaround
           child._plugins.compilation = compilationPlugins.concat(child._plugins.compilation);
-          // child.apply(new webpack.DefinePlugin({
-          //   process: {
-          //     env: {
-          //       BOXART_ENV: JSON.stringify('compile'),
-          //     },
-          //   },
-          // }));
 
           child.runAsChild(function(err) {
             if (err) {
@@ -81,15 +77,19 @@ class FunctionCompilePlugin {
             try {
               const asset = childCompilation.assets['__function_compile_plugin__.js'];
               const source = asset.source();
-              // console.log(source);
-              const output = eval(source);
+
+              const output = new Function([
+                'let output;',
+                'function jsonpFunction(entry) {output = entry;};',
+                source,
+                'return output;',
+              ].join('\n'))();
 
               childCompilation.fileDependencies.forEach(loaderContext.addDependency);
-              // console.log(childCompilation.fileDependencies);
 
-              Object.keys(compilation.assets).forEach(key => {
-                delete compilation.assets[key];
-              });
+              // Object.keys(compilation.assets).forEach(key => {
+              //   delete compilation.assets[key];
+              // });
 
               cb(null, output && output.default || output);
             }

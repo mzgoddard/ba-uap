@@ -39,7 +39,7 @@ module.exports = function(source) {
           ${Object.entries(type).map(([name, animation]) => {
             return `${name}: {
               ${Object.entries(animation).map(([component, func]) => {
-                return `${component}: ${compile(func).toString()}()`;
+                return `${component}: ${compile(func, component === 'animate' ? {methods: ['eq']} : {}).toString()}()`;
               }).join(',')}
             }`;
           }).join(',')}
