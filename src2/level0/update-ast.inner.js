@@ -49,7 +49,17 @@ const walker = ast.context(({
     copy: func(['dest', 'src'], [
       w('dest', or(r('dest'), l({}))),
       for_of(obj, ['key', 'value'], [
-        st(r('dest'), r('key'), lo(r('src'), r('key'))),
+        st(
+          r('dest'),
+          r('key'),
+          call(
+            lo(r('value'), l('copy')),
+            [
+              lo(r('dest'), r('key')),
+              lo(r('src'), r('key'))
+            ]
+          )
+        ),
       ]),
       r('dest'),
     ]),
@@ -79,19 +89,48 @@ object.args = objectArgs;
 
 const elementsArgs = [['obj'], r('obj')];
 const elements = ast.context(({
-  methods, func, w, r, or, l, for_of, st, call, lo
+  methods, func, w, r, or, l, for_of, st, call, lo, branch, ne, body,
 }) => obj => (
   walker(obj, [
     w('state', or(r('state'), l({}))),
+    w('rootElement', lo(
+      lo(
+        lo(r('animated'), l('animated')),
+        l('root')
+      ),
+      l('element')
+    )),
     for_of(obj, ['key', 'value'], [
+      st(
+        lo(r('animated'), l('animated')),
+        r('key'),
+        or(lo(lo(r('animated'), l('animated')), r('key')), l({}))
+      ),
+      branch(ne(r('key'), l('root')), [
+        st(
+          lo(
+            lo(r('animated'), l('animated')),
+            r('key')
+          ),
+          l('element'),
+          lo(call(
+            lo(
+              r('rootElement'),
+              l('getElementsByClassName')
+            ),
+            [r('key')]
+          ), l(0)),
+        ),
+      ]),
       st(r('state'), r('key'), call(
         r('value'),
         [
-          lo(lo(lo(lo(r('animated'), l('animated')), l('elements')), r('key')), l('element')),
-          r('state'),
+          lo(lo(lo(r('animated'), l('animated')), r('key')), l('element')),
+          lo(r('state'), r('key')),
           r('animated'),
         ]
       )),
+      body([]),
     ]),
     r('state'),
   ])

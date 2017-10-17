@@ -13,6 +13,15 @@ class Token extends Node {
 }
 
 class Local extends Node {
+  constructor(...args) {
+    super(...args);
+
+    if (typeof this.name !== 'string') {
+      console.log(20, this.name);
+      throw new Error('assertion: Local "name" must be a string.');
+    }
+  }
+
   toString() {
     return this.name;
   }
@@ -36,8 +45,15 @@ class Expr extends Node {
       return this.expr.join('');
     }
     catch(e) {
-      console.log(this.expr);
-      throw e;
+      if (this.expr[0].type === 'local') {
+        console.log(49, this.expr[0].name);
+        if (this.expr[0].name.op === 'func') {
+          console.log(51, this.expr[0].name.body.body);
+        }
+      }
+      console.log(54, JSON.stringify(this.expr));
+      return '"bad expression"';
+      // throw e;
     }
   }
 }
@@ -224,6 +240,7 @@ const _compile_literal = ({compile, pointer, stack, scope}) => {
     ) {
       return local(_compile_lookup(stack, scope, pointer.value.name)[pointer.value.name]);
     }
+    // pointer.value.name.op && console.log(pointer.value);
     return literal(pointer.value.name);
     // return compile(pointer.value);
   }
@@ -336,6 +353,11 @@ const _compile_read = ({write, compile, pointer, scope, stack}) => {
     return compile(_scope[pointer.name]);
   }
   else {
+    // if (_scope[pointer.name].op) {
+    //   console.log(_scope[pointer.name]);
+    //   throw new Error('trying to make a local of a token');
+    // }
+    !_scope[pointer.name] && console.log(360, pointer.name, _scope);
     return local(_scope[pointer.name]);
   }
 };
@@ -466,6 +488,7 @@ const _compile_ops = {
   '-': (a, b) => binary(token(' - '), a, b),
   '*': (a, b) => binary(token(' * '), a, b),
   '/': (a, b) => binary(token(' / '), a, b),
+  '%': (a, b) => binary(token(' % '), a, b),
 
   'min': (a, b) => lift([token('Math.min('), a, token(', '), b, token(')')]),
   'max': (a, b) => lift([token('Math.max('), a, token(', '), b, token(')')]),
@@ -907,6 +930,9 @@ const _semicolons = (value, index, ary) => {
 
 const _compile_call = ({write, compile, pointer, context}) => {
   let func = _call_search(pointer.func, context);
+  if (func && func.op === 'methods') {
+    func = func.methods.main;
+  }
   let _result;
   if (
     !func ||
@@ -1105,9 +1131,10 @@ const _compile_func = ({write, compile, pointer, context}) => {
       maybeCall = _call_search(args[index], context);
     }
     catch (e) {}
-    if (maybeCall && maybeCall.op === 'methods') {
-      maybeCall = maybeCall.methods.main;
-    }
+    // args[index] && args[index].op === 'func' && !maybeCall && console.log(args[index]);
+    // if (maybeCall && maybeCall.op === 'methods') {
+    //   maybeCall = maybeCall.methods.main;
+    // }
     if (args[index].op === 'literal' && args[index].value.op === 'read') {
       context.scope[name] = oldScope[args[index].value.name];
     }
@@ -1118,11 +1145,40 @@ const _compile_func = ({write, compile, pointer, context}) => {
       context.scope[name] = oldScope[args[index].name];
     }
     else if (maybeCall && !maybeCall.notFound) {
-      context.scope[name] = maybeCall;
+      (maybeCall.op !== 'func' && maybeCall.op !== 'methods') && (console.log(1147, 'maybeCall', maybeCall));
+      if (maybeCall.type === 'local') {
+        context.scope[name] = maybeCall.name;
+        console.log(1150, context.scope[name], context.scope, oldScope);
+      }
+      else {
+        context.scope[name] = maybeCall;
+      }
+      // context.scope[name] = maybeCall;
     }
     else {
-      _args.push(a.write(name, args[index]));
+      args[index] && args[index].op === 'binary' && console.log(1157, args[index]);
+      if (
+        args[index].op === 'binary' &&
+        args[index].operator === '||' &&
+        args[index].left.op === 'load' &&
+        args[index].left.ref.op === 'literal' &&
+        Array.isArray(args[index].left.ref.value)
+      ) {
+        _args.push(a.write(name), args[index].right);
+      }
+      else {
+        _args.push(a.write(name, args[index]));
+      }
     }
+    // if (context.scope[name] && context.scope[name].op === 'methods') {
+    //   console.log(context.scope[name]);
+    //   if (context.scope[name].methods.fn) {
+    //     context.scope[name] = context.scope[name].methods.fn;
+    //   }
+    //   else {
+    //     context.scope[name] = context.scope[name].methods.main;
+    //   }
+    // }
   });
 
   const _expr = compile(a.body(_args.concat(pointer.body.body)));

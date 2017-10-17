@@ -27,6 +27,7 @@ const add = (left, right) => binary('+', left, right);
 const sub = (left, right) => binary('-', left, right);
 const mul = (left, right) => binary('*', left, right);
 const div = (left, right) => binary('/', left, right);
+const mod = (left, right) => binary('%', left, right);
 const min = (left, right) => binary('min', left, right);
 const max = (left, right) => binary('max', left, right);
 
@@ -71,6 +72,7 @@ module.exports = {
   sub,
   mul,
   div,
+  mod,
   min,
   max,
 

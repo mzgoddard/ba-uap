@@ -283,9 +283,9 @@ const elements = ast.context(({
       for_of(o, ['key', 'value'], [
         // value(..., state, animated)
         call(r('value'), [
-          // animated.animated.elements[key].element
-          lo(lo(lo(lo(r('animated'), l('animated')), l('elements')), r('key')), l('element')),
-          r('state'),
+          // animated.animated[key].element
+          lo(lo(lo(r('animated'), l('animated')), r('key')), l('element')),
+          lo(r('state'), r('key')),
           r('animated'),
         ]),
       ]),
@@ -296,7 +296,7 @@ const elements = ast.context(({
       for_of(o, ['key', 'value'], [
         st(r('state'), r('key'), call(lo(r('value'), l('store')), [
           lo(r('state'), r('key')),
-          lo(lo(lo(lo(r('animated'), l('animated')), l('elements')), r('key')), l('element')),
+          lo(lo(lo(r('animated'), l('animated')), r('key')), l('element')),
           r('animated'),
         ])),
       ]),
@@ -305,7 +305,7 @@ const elements = ast.context(({
     restore: func(['element', 'state', 'animated'], [
       for_of(o, ['key', 'value'], [
         call(lo(r('value'), l('restore')), [
-          lo(lo(lo(lo(r('animated'), l('animated')), l('elements')), r('key')), l('element')),
+          lo(lo(lo(r('animated'), l('animated')), r('key')), l('element')),
           lo(r('state'), r('key')),
           r('animated'),
         ]),

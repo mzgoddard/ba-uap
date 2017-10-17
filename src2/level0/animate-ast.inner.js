@@ -120,7 +120,16 @@ const object = ast.context(({
     o: methods(obj),
     a: func(['b', 't', 'state', 'begin', 'end'], [
       for_of(obj, ['key', 'value'], [
+        // store(r('state'), r('key'), l(1)),
         store(r('state'), r('key'),
+          // call(lo(r('value'), l('a')), [
+          //   r('value'),
+          //   // lo(lo(r('b'), l('o')), r('key')),
+          //   r('t'),
+          //   lo(r('state'), r('key')),
+          //   lo(r('begin'), r('key')),
+          //   lo(r('end'), r('key')),
+          // ])
           call(lo(r('value'), l('a')), [
             lo(lo(r('b'), l('o')), r('key')),
             r('t'),
@@ -162,7 +171,7 @@ const easing = ast.context(({
         ]),
         r('state'),
         r('begin'),
-        r('end')
+        r('end'),
       ]),
     ]),
     a: func(['a', 't', 'state', 'begin', 'end'], [
@@ -171,7 +180,7 @@ const easing = ast.context(({
         call(l(tfn), [r('t'), r('state'), r('begin'), r('end')]),
         r('state'),
         r('begin'),
-        r('end')
+        r('end'),
       ]),
     ]),
     eq: func(['t', 'state', 'begin', 'end'], [
@@ -179,7 +188,7 @@ const easing = ast.context(({
         call(l(tfn), [r('t'), r('state'), r('begin'), r('end')]),
         r('state'),
         r('begin'),
-        r('end')
+        r('end'),
       ]),
     ]),
   })
@@ -188,12 +197,12 @@ easing.args = easingArgs;
 
 const durationArgs = [['fn', 'duration'], r('fn'), r('duration')];
 const duration = ast.context(({
-  methods, func, call, l, r, lo, div, gte
+  methods, func, call, l, r, lo, div, gte, mod,
 }) => (fn, duration) => (
   methods({
     main: func(['t', 'state', 'begin', 'end'], [
       call(l(fn), [
-        div(r('t'), l(duration)),
+        mod(div(r('t'), l(duration)), l(1)),
         r('state'),
         r('begin'),
         r('end')
@@ -202,7 +211,7 @@ const duration = ast.context(({
     a: func(['a', 't', 'state', 'begin', 'end'], [
       call(lo(l(fn), l('a')), [
         r('a'),
-        div(r('t'), l(duration)),
+        mod(div(r('t'), l(duration)), l(1)),
         r('state'),
         r('begin'),
         r('end')
@@ -214,6 +223,39 @@ const duration = ast.context(({
   })
 ));
 duration.args = durationArgs;
+
+const repeatArgs = [['fn', 'until'], r('fn'), r('until')];
+const repeat = ast.context(({
+  methods, func, call, l, mod, div, r, lo, mul, gte, w,
+}) => (fn, until) => (
+  methods({
+    main: func(['t', 'state', 'begin', 'end'], [
+      call(l(fn), [
+        r('t'),
+        r('state'),
+        r('begin'),
+        r('end'),
+      ]),
+    ]),
+    a: func(['a', 't', 'state', 'begin', 'end'], [
+      call(lo(l(fn), l('a')), [
+        r('a'),
+        r('t'),
+        r('state'),
+        r('begin'),
+        r('end'),
+      ]),
+    ]),
+    eq: func(['t', 'state', 'begin', 'end'], [
+      w('cmp', call(l(until), [r('t'), r('state'), r('begin'), r('end')])),
+      gte(
+        r('cmp'),
+        l(1)
+      ),
+    ]),
+  })
+));
+repeat.args = repeatArgs;
 
 const toArgs = [['a', 'b'], r('a'), r('b')];
 const to = ast.context(() => (
@@ -254,15 +296,22 @@ const keyframes = ast.context(({
       // let out = state;
       w('out', r('state')),
       // let _t = Math.max(Math.min(t * sum), 1), 0);
-      w('t', max(min(mul(r('t'), r('sum')), l(1)), l(0))),
+      w('t', max(min(mul(r('t'), r('sum')), r('sum')), l(0))),
       // for (let [_, value] of Object.entries(frames)) {
       for_of(frames, ['_', 'value'], [
         // if (i > 0 && t < 0) {
         branch(and(gt(r('_for_of_index'), l(0)), lte(r('t'), l(0))), [
           // out = frames[i - 1].a(value, frames[i - 1].t() + t, state, begin, end);
           w('out', call(lo(lo(l(frames), sub(r('_for_of_index'), l(1))), l('a')), [
-            l(r('value')),
+            r('value'),
+            // or(lo(r('value'), l('fn')), r('value')),
+            // r('value'),
+            // func([], [l(0)]),
+            // l(seconds(0.001, object({
+            //   opacity: constant(1),
+            // }))),
             add(r('t'), call(lo(lo(l(frames), sub(r('_for_of_index'), l(1))), l('t')), [])),
+            // r('t'),
             r('state'),
             r('begin'),
             r('end'),
@@ -289,11 +338,13 @@ const keyframes = ast.context(({
         r('s'),
       ])), [r('frames')])),
       w('out', r('state')),
-      w('t', max(min(mul(r('t'), r('sum')), l(1)), l(0))),
+      w('t', max(min(mul(r('t'), r('sum')), r('sum')), l(0))),
       for_of(frames, ['_', 'value'], [
         w('t', sub(r('t'), call(lo(r('value'), l('t')), []))),
         branch(lte(r('t'), l(0)), [
           w('out', call(lo(r('value'), l('a')), [
+            // lo(l(frames), add(r('_for_of_index'), l(1))),
+            // r('a'),
             or(
               lo(l(frames), add(r('_for_of_index'), l(1))),
               r('a')
@@ -318,7 +369,7 @@ keyframes.args = keyframesArgs;
 
 const frameArgs = [['timer', 'fn'], r('timer'), r('fn')];
 const frame = ast.context(({
-  methods, func, call, l, r, lo,
+  methods, func, call, l, r, lo, or,
 }) => (timer, fn) => (
   methods({
     main: func(['t', 'state', 'begin', 'end'], [
@@ -331,13 +382,14 @@ const frame = ast.context(({
     ]),
     a: func(['a', 't', 'state', 'begin', 'end'], [
       call(lo(l(fn), l('a')), [
-        r('a'),
+        or(lo(r('a'), l('fn')), r('a')),
         call(l(timer), [r('t')]),
         r('state'),
         r('begin'),
         r('end'),
       ]),
     ]),
+    fn: fn,
     t: func([], [
       call(lo(l(timer), l('t')), []),
     ]),
@@ -396,10 +448,17 @@ percent.args = percentArgs;
 
 const keyframes_exampleArgs = [[]];
 const keyframes_example = () => duration(keyframes([
-  seconds(0.999, constant(0)),
-  seconds(0.001, constant(1)),
+  seconds(0.999, object({opacity: constant(0)})),
+  seconds(0.001, object({opacity: constant(1)})),
 ]), 1);
 keyframes_example.args = keyframes_exampleArgs;
+
+const object_to_exampleArgs = [[]];
+const object_to_example = () => to(
+  seconds(0.999, object({opacity: constant(0)})),
+  seconds(0.001, object({opacity: constant(1)}))
+);
+object_to_example.args = object_to_exampleArgs;
 
 module.exports = {
   value,
@@ -419,4 +478,6 @@ module.exports = {
   ms,
   percent,
   keyframes_example,
+  object_to_example,
+  repeat,
 };
