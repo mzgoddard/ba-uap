@@ -1,10 +1,5 @@
 import {Component} from 'preact';
 
-// level 0
-import animate from '../level0/animate';
-import present from '../level0/present';
-import update from '../level0/update';
-
 // level 1
 import AnimatedManager from '../level1/animated-manager.new';
 import AnimatedStateFactory from '../level1/animated-state-factory';
@@ -67,9 +62,5 @@ class Preact extends Component {
 export default Preact;
 
 export {
-  animate,
-  present,
-  update,
-
   RunLoop,
 };

@@ -1,4 +1,4 @@
-import RunLoop from './runloop';
+import RunLoop from './runloop.new';
 
 class AnimatedManager {
   constructor(factory, loop = RunLoop.main) {
@@ -11,7 +11,7 @@ class AnimatedManager {
   get(type, id) {
     let animatedState = this.states[id];
     if (!animatedState) {
-      animatedState = this.states[id] = factory(type);
+      animatedState = this.states[id] = this.factory(type);
     }
 
     return animatedState;
@@ -34,7 +34,7 @@ class AnimatedManager {
   setElement(type, id, element) {
     const animatedState = this.get(type, id);
     if (animatedState) {
-      const {animated = {root: {element: null}}} = animatedState.data.animated;
+      const animated = animatedState.data.animated || {root: {element: null}};
       animated.root.element = element;
       animatedState.schedule(animated, this.loop);
     }

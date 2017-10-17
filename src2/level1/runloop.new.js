@@ -24,8 +24,60 @@ const ORDER = {
 
 const MAX_DT = 0.033;
 
+const control = function(_this, input) {
+  const oldState = _this._state;
+  let state = _this._state;
+
+  if (oldState === EMPTY) {
+    if (input === RESUME) {
+      state = BOUND;
+    }
+    else if (input === ADD) {
+      state = HOLDING;
+    }
+  }
+  else if (oldState === HOLDING) {
+    if (input === RESUME) {
+      state = RUNNING;
+    }
+    else if (input === REMOVE) {
+      state = EMPTY;
+    }
+  }
+  else if (state === BOUND) {
+    if (input === PAUSE) {
+      state = EMPTY;
+    }
+    else if (input === ADD) {
+      state = RUNNING;
+    }
+  }
+  else if (state === RUNNING) {
+    if (input === PAUSE) {
+      state = HOLDING;
+    }
+    else if (input === REMOVE) {
+      state = BOUND;
+    }
+  }
+
+  if (state !== oldState) {
+    _this._state = state;
+
+    if (oldState === RUNNING) {
+      _this.cancelFrame.call(null, _this._frameId);
+    }
+    else if (state === RUNNING) {
+      _this.last = _this.now();
+      _this._frameId = _this.requestFrame.call(null, _this.loop);
+    }
+  }
+};
+
 const _remove = function(args) {
-  this.remove(...args);
+  const [fn, data, stage] = args;
+  this.remove(fn, data);
+  this.remove(this._remove, args, stage);
 };
 
 const _soonNull = function() {
@@ -37,10 +89,12 @@ class RunLoop {
     requestFrame = window.requestAnimationFrame,
     cancelFrame = window.cancelAnimationFrame,
     now = Date.now,
-  }) {
+  } = {}) {
     this._state = BOUND;
+    this.itemCount = 0;
 
     this.stages = [[], [], [], [], []];
+    this.cleanup = [];
 
     this.requestFrame = requestFrame;
     this.cancelFrame = cancelFrame;
@@ -51,57 +105,8 @@ class RunLoop {
     this.loop = this.loop.bind(this);
   }
 
-  control(input) {
-    const oldState = this._state;
-    let state = this._state;
-
-    if (oldState === EMPTY) {
-      if (input === RESUME) {
-        state = BOUND;
-      }
-      else if (input === ADD) {
-        state = HOLDING;
-      }
-    }
-    else if (oldState === HOLDING) {
-      if (input === RESUME) {
-        state = RUNNING;
-      }
-      else if (input === REMOVE) {
-        state = EMPTY;
-      }
-    }
-    else if (state === BOUND) {
-      if (input === PAUSE) {
-        state = EMPTY;
-      }
-      else if (input === ADD) {
-        state = RUNNING;
-      }
-    }
-    else if (state === RUNNING) {
-      if (input === PAUSE) {
-        state = HOLDING;
-      }
-      else if (input === REMOVE) {
-        state = BOUND;
-      }
-    }
-
-    if (state !== oldState) {
-      this._state = state;
-
-      if (oldState === RUNNING) {
-        this.cancelFrame(this._frameId);
-      }
-      else if (state === RUNNING) {
-        this._frameId = this.requestFrame(this.loop);
-      }
-    }
-  }
-
   loop() {
-    this._frameId = this.requestFrame(this.loop);
+    this._frameId = this.requestFrame.call(null, this.loop);
 
     const {cleanup} = this;
     let oldItem, oldData, index;
@@ -123,7 +128,7 @@ class RunLoop {
     cleanup.length = 0;
 
     if (this.itemCount === 0) {
-      this.control(REMOVE);
+      control(this, REMOVE);
       return;
     }
 
@@ -144,16 +149,16 @@ class RunLoop {
   }
 
   pause() {
-    this.control(PAUSE);
+    control(this, PAUSE);
   }
 
   resume() {
-    this.control(RESUME);
+    control(this, RESUME);
   }
 
   add(fn, data = null, stage = ANIMATE) {
     if (this.itemCount === 0) {
-      this.control(ADD);
+      control(this, ADD);
     }
 
     this.itemCount += 1;
@@ -174,7 +179,7 @@ class RunLoop {
 
   once(fn, data = null, stage = BEFORE_ITEMS) {
     this.add(fn, data, stage);
-    this.add(this._remove, [fn, data], stage);
+    this.add(this._remove, [fn, data, stage], stage);
   }
 
   soon() {
@@ -184,3 +189,23 @@ class RunLoop {
     return this._soon;
   }
 }
+
+RunLoop.stages = {
+  BEFORE_ITEMS,
+  AFTER_ITEMS,
+  ITEMS,
+  ANIMATE,
+  DESTROY,
+};
+
+if (typeof requestAnimationFrame === 'function') {
+  RunLoop.main = new RunLoop();
+}
+else {
+  RunLoop.main = new RunLoop({
+    requestFrame: fn => setTimeout(fn, 16),
+    cancelFrame: id => clearTimeout(id),
+  });
+}
+
+export default RunLoop;

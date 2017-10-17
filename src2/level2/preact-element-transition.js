@@ -1,6 +1,6 @@
 import BaseTransition from './base-transition';
 
-import RunLoop from '../level1/runloop';
+import RunLoop from '../level1/runloop.new';
 
 const falseFn = () => false;
 

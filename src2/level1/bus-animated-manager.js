@@ -19,3 +19,5 @@ class BusAnimatedManager {
     animatedState.resolve = () => this.stateEnd(type, id, state);
   }
 }
+
+export default BusAnimatedManager;
