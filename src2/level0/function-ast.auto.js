@@ -17,7 +17,6 @@ class Local extends Node {
     super(...args);
 
     if (typeof this.name !== 'string') {
-      console.log(20, this.name);
       throw new Error('assertion: Local "name" must be a string.');
     }
   }
@@ -45,15 +44,8 @@ class Expr extends Node {
       return this.expr.join('');
     }
     catch(e) {
-      if (this.expr[0].type === 'local') {
-        console.log(49, this.expr[0].name);
-        if (this.expr[0].name.op === 'func') {
-          console.log(51, this.expr[0].name.body.body);
-        }
-      }
-      console.log(54, JSON.stringify(this.expr));
-      return '"bad expression"';
-      // throw e;
+      // return '"bad expression"';
+      throw e;
     }
   }
 }
@@ -230,7 +222,6 @@ const _compile_literal = ({compile, pointer, stack, scope}) => {
   if (pointer.value && pointer.value.op === 'read') {
     if (
       _compile_lookup(stack, scope, pointer.value.name)[pointer.value.name] &&
-      // (console.log(_compile_lookup(stack, scope, pointer.value.name)), true) &&
       _compile_lookup(stack, scope, pointer.value.name)[pointer.value.name].op === 'literal'
     ) {
       return _compile_lookup(stack, scope, pointer.value.name)[pointer.value.name];
@@ -240,7 +231,6 @@ const _compile_literal = ({compile, pointer, stack, scope}) => {
     ) {
       return local(_compile_lookup(stack, scope, pointer.value.name)[pointer.value.name]);
     }
-    // pointer.value.name.op && console.log(pointer.value);
     return literal(pointer.value.name);
     // return compile(pointer.value);
   }
@@ -353,11 +343,6 @@ const _compile_read = ({write, compile, pointer, scope, stack}) => {
     return compile(_scope[pointer.name]);
   }
   else {
-    // if (_scope[pointer.name].op) {
-    //   console.log(_scope[pointer.name]);
-    //   throw new Error('trying to make a local of a token');
-    // }
-    !_scope[pointer.name] && console.log(360, pointer.name, _scope);
     return local(_scope[pointer.name]);
   }
 };
@@ -745,7 +730,6 @@ const _call_search = (ref, context) => {
   else if (
     ref.op === 'binary' && ref.operator === '||' && (
       ref.left.op !== 'load' &&
-        // (console.log(ref.left, _call_search(ref.left, context)), true) &&
         _call_search(ref.left, context) &&
         !_call_search(ref.left, context).notFound && (
           _call_search(ref.left, context).op === 'func' ||
@@ -754,7 +738,6 @@ const _call_search = (ref, context) => {
           Array.isArray(_call_search(ref.left, context))
         ) ||
       ref.left.op === 'load' && ref.left.ref.op !== 'load' &&
-        // (console.log(ref.left.ref, _call_search(ref.left.ref, context)), true) &&
         _call_search(ref.left.ref, context) &&
         !_call_search(ref.left.ref, context).notFound && (
           _call_search(ref.left.ref, context).op === 'func' ||
@@ -764,7 +747,6 @@ const _call_search = (ref, context) => {
         ) ||
       ref.left.op === 'load' && ref.left.ref.op === 'load' &&
         ref.left.ref.ref.op !== 'load' &&
-        // (console.log(ref.left.ref.ref, _call_search(ref.left.ref.ref, context)), true) &&
         _call_search(ref.left.ref.ref, context) &&
         !_call_search(ref.left.ref.ref, context).notFound (
           _call_search(ref.left.ref.ref, context).op === 'func' ||
@@ -788,7 +770,6 @@ const _call_search = (ref, context) => {
       return _left;
     }
     else {
-      // console.log(ref.left, ref.left.ref && _call_search(ref.left.ref, context));
       const _right = _call_search(ref.right, context);
       if (typeof _right === 'string') {
         return null;
@@ -811,7 +792,6 @@ const _call_search = (ref, context) => {
   else if (
     ref.op === 'binary' &&
     ref.operator === '-' &&
-    // (console.log(_call_search(ref.left, context), typeof _call_search(ref.left, context), _call_search(ref.right, context), typeof _call_search(ref.right, context)), true) &&
     typeof _call_search(ref.left, context) === 'number' &&
     typeof _call_search(ref.right, context) === 'number'
   ) {
@@ -822,7 +802,6 @@ const _call_search = (ref, context) => {
   else if (
     ref.op === 'binary' &&
     ref.operator === '+' &&
-    // (console.log(_call_search(ref.left, context), typeof _call_search(ref.left, context), _call_search(ref.right, context), typeof _call_search(ref.right, context)), true) &&
     typeof _call_search(ref.left, context) === 'number' &&
     typeof _call_search(ref.right, context) === 'number'
   ) {
@@ -852,15 +831,6 @@ const _call_search = (ref, context) => {
   else if (
     ref.op === 'load' &&
     _call_search(ref.ref, context) &&
-    // (
-    //   Array.isArray(_call_search(ref.ref, context)) &&
-    //   console.log(
-    //     _call_search(ref.ref, context),
-    //     _call_search(ref.member, context)
-    //   ),
-    //   true
-    // ) &&
-    // (ref.member.op === 'literal' && console.log(_call_search(ref.ref, context), _call_search(ref.member, context)), true) &&
     (
       ref.member.op === 'literal' ||
       typeof _call_search(ref.member, context) === 'number' ||
@@ -870,11 +840,6 @@ const _call_search = (ref, context) => {
     )
   ) {
     let _ref = _call_search(ref.ref, context);
-    // !_ref && console.log(ref);
-    // if (Array.isArray(_ref)) {
-    //   console.log(_call_search(ref.member, context));
-    //   return _ref[_call_search(ref.member, context)];
-    // }
     if (ref.member.op === 'literal' && ref.member.value === 'methods') {
       return _ref;
     }
@@ -885,8 +850,6 @@ const _call_search = (ref, context) => {
       return _ref[ref.member.value];
     }
     else {
-      // !_ref[_call_search(ref.member, context)] &&
-      //   console.log(_ref, _call_search(ref.member, context));
       return _ref[_call_search(ref.member, context)];
     }
   }
@@ -1131,10 +1094,6 @@ const _compile_func = ({write, compile, pointer, context}) => {
       maybeCall = _call_search(args[index], context);
     }
     catch (e) {}
-    // args[index] && args[index].op === 'func' && !maybeCall && console.log(args[index]);
-    // if (maybeCall && maybeCall.op === 'methods') {
-    //   maybeCall = maybeCall.methods.main;
-    // }
     if (args[index].op === 'literal' && args[index].value.op === 'read') {
       context.scope[name] = oldScope[args[index].value.name];
     }
@@ -1145,18 +1104,14 @@ const _compile_func = ({write, compile, pointer, context}) => {
       context.scope[name] = oldScope[args[index].name];
     }
     else if (maybeCall && !maybeCall.notFound) {
-      (maybeCall.op !== 'func' && maybeCall.op !== 'methods') && (console.log(1147, 'maybeCall', maybeCall));
       if (maybeCall.type === 'local') {
         context.scope[name] = maybeCall.name;
-        console.log(1150, context.scope[name], context.scope, oldScope);
       }
       else {
         context.scope[name] = maybeCall;
       }
-      // context.scope[name] = maybeCall;
     }
     else {
-      args[index] && args[index].op === 'binary' && console.log(1157, args[index]);
       if (
         args[index].op === 'binary' &&
         args[index].operator === '||' &&
@@ -1170,15 +1125,6 @@ const _compile_func = ({write, compile, pointer, context}) => {
         _args.push(a.write(name, args[index]));
       }
     }
-    // if (context.scope[name] && context.scope[name].op === 'methods') {
-    //   console.log(context.scope[name]);
-    //   if (context.scope[name].methods.fn) {
-    //     context.scope[name] = context.scope[name].methods.fn;
-    //   }
-    //   else {
-    //     context.scope[name] = context.scope[name].methods.main;
-    //   }
-    // }
   });
 
   const _expr = compile(a.body(_args.concat(pointer.body.body)));
@@ -1768,7 +1714,6 @@ const rules = {
           node.expr[2] && node.expr[2].token === ' = '
         ) {
           if (node._read === 0) {
-            // console.log('remove', String(node));
             node.expr = [];
             return;
           }
