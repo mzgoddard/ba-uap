@@ -1,4 +1,4 @@
-import {update, animate, present} from '../../src2/level3/preact';
+import {update, animate, present} from '../../src2/level0';
 
 const animations = {
   icon: {

@@ -2,7 +2,7 @@ import {h, Component, render} from 'preact';
 // import 'preact/devtools';
 
 // import Boxart, {update, animate, present} from '../../src/preact';
-import Boxart from '../../src/preact';
+import Boxart from '../../src2/level3/preact';
 
 import animations from './index.animations';
 

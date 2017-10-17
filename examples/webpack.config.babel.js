@@ -27,6 +27,7 @@ module.exports = {
     'preact-auto-transition-live': './preact-auto-transition-live',
     'preact-ref-test': './preact-ref-test',
     '2048-1': './2048-1',
+    'shapes': './shapes',
   },
   output: {
     path: dir('../dist'),
@@ -49,6 +50,7 @@ module.exports = {
           dir('preact-auto-transition'),
           dir('preact-auto-transition-live'),
           dir('2048-1'),
+          dir('shapes'),
         ],
         loader: 'babel-loader',
         options: {
@@ -69,6 +71,7 @@ module.exports = {
           dir('preact-auto-transition'),
           dir('preact-auto-transition-live'),
           dir('2048-1'),
+          dir('shapes'),
         ],
         exclude: [dir('../node_modules')],
         loader: 'babel-loader',
@@ -95,14 +98,15 @@ module.exports = {
   plugins: [
     new (require('../src2/webpack/function-compile-plugin'))(),
     new webpack.DefinePlugin({
-      process: {env: {
-        // BOXART_ENV: '"generated"',
-      }},
+      'process.env.BOXART_ENV': '"generated"',
+      // process: {env: {
+      //   BOXART_ENV: '"generated"',
+      // }},
     }),
-    new webpack.optimize.CommonsChunkPlugin({
-      name: 'vendor',
-      filename: 'vendor.js',
-    }),
+    // new webpack.optimize.CommonsChunkPlugin({
+    //   name: 'vendor',
+    //   filename: 'vendor.js',
+    // }),
     new HtmlWebpackPlugin({
       template: './index.html.js',
       chunks: [],
@@ -123,6 +127,7 @@ module.exports = {
     'preact-auto-transition-live',
     'preact-ref-test',
     '2048-1',
+    'shapes',
   ].map(name => new HtmlWebpackPlugin({
     filename: `${name}/index.html`,
     template: `./${name}/index.html.js`,

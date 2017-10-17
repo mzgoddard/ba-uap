@@ -8,10 +8,17 @@ const dir = (...args) => join(__dirname, ...args);
 
 module.exports = {
   context: dir(),
-  entry: './src/preact',
+  entry: {
+    level0: './src2/level0',
+    level1: './src2/level1',
+    'preact-crawl': './src2/level3/preact-crawl',
+    preact: './src2/level3/preact',
+    'preact-no0': './src2/level3/preact-no0',
+  },
   output: {
     path: dir('dist'),
-    filename: 'preact.js'
+    filename: '[name].js',
+    libraryTarget: 'umd',
   },
   devtool: 'source-map',
   externals: {
@@ -30,7 +37,10 @@ module.exports = {
         loader: 'babel-loader',
         options: {
           presets: [
-            ['env', {targets: {browsers: ['chrome >= 56']}, modules: false}],
+            ['env', {
+              modules: false,
+              loose: true
+            }],
           ],
         },
       },
@@ -40,7 +50,10 @@ module.exports = {
         loader: 'babel-loader',
         options: {
           presets: [
-            ['env', {targets: {browsers: ['chrome >= 56']}, modules: false}],
+            ['env', {
+              modules: false,
+              loose: true
+            }],
             'preact',
           ],
         },
@@ -57,6 +70,14 @@ module.exports = {
   },
   plugins: [
     // new (require('webpack').optimize.UglifyJsPlugin)(),
+    // new (require('webpack').EnvironmentPlugin)(),
+    // new (require('webpack').IgnorePlugin)(/pattern-search/),
+    new (require('webpack').DefinePlugin)({
+      process: {env: {
+        NODE_ENV: JSON.stringify('production'),
+        BOXART_ENV: JSON.stringify('generated'),
+      }},
+    }),
     // new HardSourceWebpackPlugin(),
     {
       apply: function(compiler) {
