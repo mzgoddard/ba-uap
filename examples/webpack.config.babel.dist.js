@@ -22,6 +22,13 @@ module.exports = {
     'flip': './flip',
     'spiral': './spiral',
     'react-transition': './react-transition',
+    'preact-transition': './preact-transition',
+    'preact-auto-transition': './preact-auto-transition',
+    'preact-auto-transition-live': './preact-auto-transition-live',
+    'preact-ref-test': './preact-ref-test',
+    '2048-1': './2048-1',
+    'shapes': './shapes',
+    'svg': './svg',
   },
   output: {
     path: dir('../dist'),
@@ -37,12 +44,60 @@ module.exports = {
     rules: [
       {
         test: /\.js$/,
+        exclude: [
+          dir('../node_modules'),
+          dir('preact-transition'),
+          dir('preact-ref-test'),
+          dir('preact-auto-transition'),
+          dir('preact-auto-transition-live'),
+          dir('2048-1'),
+          dir('shapes'),
+        ],
+        loader: 'babel-loader',
+        options: {
+          presets: [
+            ['env', {
+              modules: false,
+              loose: true
+            }],
+            'react',
+          ],
+        },
+      },
+      {
+        test: /\.js$/,
+        include: [
+          dir('preact-transition'),
+          dir('preact-ref-test'),
+          dir('preact-auto-transition'),
+          dir('preact-auto-transition-live'),
+          dir('2048-1'),
+          dir('shapes'),
+        ],
         exclude: [dir('../node_modules')],
         loader: 'babel-loader',
         options: {
           presets: [
-            ['env', {targets: {browsers: ['chrome >= 56']}, modules: false}],
-            'react',
+            ['env', {
+              modules: false,
+              loose: true
+            }],
+            'preact',
+          ],
+        },
+      },
+      {
+        test: /\.js$/,
+        include: [
+          dir('svg'),
+        ],
+        loader: 'babel-loader',
+        options: {
+          presets: [
+            ['env', {
+              modules: false,
+              loose: true
+            }],
           ],
         },
       },
@@ -57,22 +112,27 @@ module.exports = {
     ],
   },
   plugins: [
+    new (require('../src2/webpack/function-compile-plugin'))(),
+    new webpack.DefinePlugin({
+      'process.env.NODE_ENV': '"production"',
+    }),
+    new webpack.DefinePlugin({
+      'process.env.BOXART_ENV': '"generated"',
+    }),
     new webpack.optimize.CommonsChunkPlugin({
       name: 'vendor',
       filename: 'vendor.js',
-    }),
-    new webpack.DefinePlugin({
-      'process.env.NODE_ENV': '"production"',
     }),
     new webpack.optimize.UglifyJsPlugin(),
     new HtmlWebpackPlugin({
       template: './index.html.js',
       chunks: [],
     }),
-    new HardSourceWebpackPlugin({
-      cacheDirectory: dir('../node_modules/.cache/hard-source/[confighash]'),
-      recordsPath: dir('../node_modules/.cache/hard-source/[confighash]/records.json'),
-      configHash: require('node-object-hash')().hash,
+    new HtmlWebpackPlugin({
+      filename: `svg/dot-plus.svg`,
+      template: `./svg/dot-plus.svg.js`,
+      chunks: ['svg', 'vendor'],
+      inject: 'svg',
     }),
   ].concat([
     'moving-box',
@@ -80,6 +140,12 @@ module.exports = {
     'flip',
     'spiral',
     'react-transition',
+    'preact-transition',
+    'preact-auto-transition',
+    'preact-auto-transition-live',
+    'preact-ref-test',
+    '2048-1',
+    'shapes',
   ].map(name => new HtmlWebpackPlugin({
     filename: `${name}/index.html`,
     template: `./${name}/index.html.js`,
