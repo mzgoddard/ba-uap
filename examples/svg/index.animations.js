@@ -189,7 +189,7 @@ const animations = {
           })),
         ])
         .duration(2)
-        .repeat(t => 0)
+        .until(t => 0)
       )),
       present: present.context(({elements, style, scale, rotatez, concat, constant, key}) => (
         elements({
