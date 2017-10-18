@@ -1,6 +1,7 @@
 const _ast = require('./function-ast');
 const astRegistry = require('./ast-registry');
 const ast = astRegistry(_ast);
+const math = require('./math-ast.inner');
 
 const r = _ast.r;
 
@@ -27,6 +28,33 @@ const value = ast.context(({
   // ]), [])
 ));
 value.args = valueArgs;
+
+const unionArgs = [['set'], r('set')];
+const union = ast.context(({
+  methods, func, for_of, call, r, lo, w, l, branch, and,
+}) => set => (
+  methods({
+    main: func(['element', 'state', 'animated'], [
+      for_of(set, ['key', 'value'], [
+        call(r('value'), [r('element'), r('state'), r('animated')]),
+      ]),
+      r('element'),
+    ]),
+    main: func(['state', 'element', 'animated'], [
+      for_of(set, ['key', 'value'], [
+        w('state', call(lo(r('value'), l('store')), [r('state'), r('element'), r('animated')])),
+      ]),
+      r('state'),
+    ]),
+    main: func(['element', 'state', 'animated'], [
+      for_of(set, ['key', 'value'], [
+        call(lo(r('value'), l('restore')), [r('element'), r('state'), r('animated')]),
+      ]),
+      r('element'),
+    ]),
+  })
+));
+union.args = unionArgs;
 
 const constantArgs = [['c'], r('c')];
 const constant = ast.context(({
@@ -81,6 +109,25 @@ const op = ast.context(({
 const [add, sub, mul, div] = ast.context(({
   add, sub, mul, div
 }) => [add, sub, mul, div].map(op));
+
+const [
+  abs,
+  mod,
+  min, max,
+  eq, ne, lt, lte, gt, gte,
+] = [
+  'abs',
+  'mod',
+  'min', 'max',
+  'eq', 'ne', 'lt', 'lte', 'gt', 'gte',
+].map(ast.context(({l, r, lo}) => op => (
+  math[op](
+    value,
+    v => lo(l(v), l('_value')),
+    ['state', 'animated'],
+    [r('state'), r('animated')]
+  )
+)));
 
 const beginArgs = [['fn'], r('fn')];
 const begin = ast.context(({
@@ -281,6 +328,10 @@ const elements = ast.context(({
   methods({
     main: func(['element', 'state', 'animated'], [
       for_of(o, ['key', 'value'], [
+        w('_begin', or(lo(r('animated'), l('_begin')), lo(r('animated'), l('begin')))),
+        st(r('animated'), l('_begin'), lo(r('_begin'), r('key'))),
+        w('_end', or(lo(r('animated'), l('_end')), lo(r('animated'), l('end')))),
+        st(r('animated'), l('_end'), lo(r('_end'), r('key'))),
         // value(..., state, animated)
         call(r('value'), [
           // animated.animated[key].element
@@ -288,6 +339,8 @@ const elements = ast.context(({
           lo(r('state'), r('key')),
           r('animated'),
         ]),
+        st(r('animated'), l('_begin'), r('_begin')),
+        st(r('animated'), l('_end'), r('_end')),
       ]),
       r('element'),
     ]),
@@ -315,6 +368,82 @@ const elements = ast.context(({
   })
 ));
 elements.args = elementsArgs;
+
+const elementArraysArgs = [['o'], r('o')];
+const elementArrays = ast.context(({
+  methods, func, for_of, st, r, call, or, lo, l, w, branch, lt, add, loop,
+}) => o => (
+  methods({
+    main: func(['element', 'state', 'animated'], [
+      for_of(o, ['key', 'value'], [
+        w('_begin', or(lo(r('animated'), l('_begin')), lo(r('animated'), l('begin')))),
+        st(r('animated'), l('_begin'), lo(r('_begin'), r('key'))),
+        w('_end', or(lo(r('animated'), l('_end')), lo(r('animated'), l('end')))),
+        st(r('animated'), l('_end'), lo(r('_end'), r('key'))),
+        w('elements', lo(lo(lo(r('animated'), l('animated')), r('key')), l('elements'))),
+        w('state2', lo(r('state'), r('key'))),
+        w('i', l(0)),
+        loop(lt(r('i'), lo(r('elements'), l('length'))), [
+          w('_begin2', or(lo(r('animated'), l('_begin')), lo(r('animated'), l('begin')))),
+          st(r('animated'), l('_begin'), lo(r('_begin2'), r('i'))),
+          w('_end2', or(lo(r('animated'), l('_end')), lo(r('animated'), l('end')))),
+          st(r('animated'), l('_end'), lo(r('_end2'), r('i'))),
+          // value(..., state, animated)
+          call(r('value'), [
+            // elements[i]
+            lo(r('elements'), r('i')),
+            lo(r('state2'), r('i')),
+            r('animated'),
+          ]),
+          st(r('animated'), l('_begin'), r('_begin2')),
+          st(r('animated'), l('_end'), r('_end2')),
+          w('i', add(r('i'), l(1))),
+        ]),
+        branch(r('i'), []),
+        st(r('animated'), l('_begin'), r('_begin')),
+        st(r('animated'), l('_end'), r('_end')),
+      ]),
+      r('element'),
+    ]),
+    store: func(['state', 'element', 'animated'], [
+      w('state', or(r('state'), l({}))),
+      for_of(o, ['key', 'value'], [
+        w('elements', lo(lo(lo(r('animated'), l('animated')), r('key')), l('elements'))),
+        st(r('state'), r('key'), or(lo(r('state'), r('key')), l([]))),
+        w('state2', lo(r('state'), r('key'))),
+        w('i', l(0)),
+        loop(lt(r('i'), lo(r('elements'), l('length'))), [
+          st(r('state2'), r('i'), call(lo(r('value'), l('store')), [
+            lo(r('state2'), r('i')),
+            lo(r('elements'), r('i')),
+            r('animated'),
+          ])),
+          w('i', add(r('i'), l(1))),
+        ]),
+        branch(r('i'), []),
+      ]),
+      r('state'),
+    ]),
+    restore: func(['element', 'state', 'animated'], [
+      for_of(o, ['key', 'value'], [
+        w('elements', lo(lo(lo(r('animated'), l('animated')), r('key')), l('elements'))),
+        w('state2', lo(r('state'), r('key'))),
+        w('i', l(0)),
+        loop(lt(r('i'), lo(r('elements'), l('length'))), [
+          call(lo(r('value'), l('restore')), [
+            lo(r('elements'), r('i')),
+            lo(r('state2'), r('i')),
+            r('animated'),
+          ]),
+          w('i', add(r('i'), l(1))),
+        ]),
+        branch(r('i'), []),
+      ]),
+      r('element'),
+    ]),
+  })
+));
+elementArrays.args = elementArraysArgs;
 
 const objectArgs = [['o'], r('o')];
 const object = ast.context(({
@@ -360,10 +489,13 @@ object.args = objectArgs;
 
 module.exports = {
   value,
+  union,
   constant,
   key,
   em, percent, deg, rad, px, rem, vh, vmax, vmin, vw,
   add, sub, mul, div,
+  abs,
+  mod, min, max, eq, ne, lt, lte, gt, gte,
   begin, end, against, to, over,
   concat,
   translate, translatex, translatey, translatez, translate3d,
@@ -373,5 +505,6 @@ module.exports = {
   style,
   styles: style,
   elements,
+  elementArrays,
   object,
 };

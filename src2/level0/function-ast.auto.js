@@ -343,7 +343,13 @@ const _compile_read = ({write, compile, pointer, scope, stack}) => {
     return compile(_scope[pointer.name]);
   }
   else {
-    return local(_scope[pointer.name]);
+    try {
+      return local(_scope[pointer.name]);
+    }
+    catch (e) {
+      console.log(pointer.name, stack);
+      throw e;
+    }
   }
 };
 
@@ -477,6 +483,7 @@ const _compile_ops = {
 
   'min': (a, b) => lift([token('Math.min('), a, token(', '), b, token(')')]),
   'max': (a, b) => lift([token('Math.max('), a, token(', '), b, token(')')]),
+  'abs': a => lift([token('Math.abs('), a, token(')')]),
 };
 
 const _compile_unary = ({write, compile, pointer}) => (
@@ -685,6 +692,16 @@ const _compile_branch = ({compile, pointer, context}) => {
     }
     return _if;
   }
+};
+
+const _compile_loop = ({compile, pointer}) => {
+  return expr([
+    token('while ('),
+      compile(pointer.test),
+    token(')'), token('{'),
+      compile(pointer.body),
+    token('}'),
+  ]);
 };
 
 const _compile_body = ({write, compile, pointer}) => {
@@ -989,7 +1006,7 @@ const _pop_names = ({names}, _names) => {
   });
 };
 
-const _compile_func = ({write, compile, pointer, context}) => {
+const _compile_func = ({write, compile, pointer, context, lookupScope}) => {
   const args = context.args;
   context.args = null;
 
@@ -1012,7 +1029,7 @@ const _compile_func = ({write, compile, pointer, context}) => {
     _body.args = pointer.args;
 
     const {options} = context;
-    const {passes = 3} = options;
+    const {passes = 10} = options;
     const {rules: _rules = Object.keys(rules)} = options;
     const ruleKeys = _rules
     .concat(...(options._ruleSets || []).map(set => ruleSets[set]))
@@ -1095,7 +1112,8 @@ const _compile_func = ({write, compile, pointer, context}) => {
     }
     catch (e) {}
     if (args[index].op === 'literal' && args[index].value.op === 'read') {
-      context.scope[name] = oldScope[args[index].value.name];
+      context.scope[name] =
+        lookupScope(args[index].value.name)[args[index].value.name];
     }
     else if (args[index].op === 'literal') {
       context.scope[name] = args[index];
@@ -1112,6 +1130,7 @@ const _compile_func = ({write, compile, pointer, context}) => {
       }
     }
     else {
+      // console.log(name, args[index]);
       if (
         args[index].op === 'binary' &&
         args[index].operator === '||' &&
@@ -1125,6 +1144,7 @@ const _compile_func = ({write, compile, pointer, context}) => {
         _args.push(a.write(name, args[index]));
       }
     }
+    // console.log(name, context.scope[name], maybeCall, args[index]);
   });
 
   const _expr = compile(a.body(_args.concat(pointer.body.body)));
@@ -1169,6 +1189,7 @@ const _compile_instr = {
   for_of: _compile_for_of,
   not_last: _compile_not_last,
   branch: _compile_branch,
+  loop: _compile_loop,
   body: _compile_body,
   call: _compile_call,
   func: _compile_func,
@@ -1763,6 +1784,110 @@ const rules = {
         else if (node.expr.length === 1) {
           return run(node.expr[0], 0, node);
         }
+        else if (
+          node.expr[2] && (
+            node.expr[2].token === ' - ' ||
+            node.expr[2].token === ' * ' ||
+            node.expr[2].token === ' / '
+          )
+        ) {
+          let run1, run3;
+          if (node.expr[1].type === 'expression') {
+            if (node.expr[1] === node) {throw new Error('circular expression');}
+            run1 = run(node.expr[1], 1, node);
+            if (run1 === node) {throw new Error('returned circular expr1')}
+            if (run1) {
+              node.expr[1] = run1;
+            }
+          }
+          else if (node.expr[1].type === 'local') {
+            if (node.expr[1].name && scope.get(node.expr[1].name)) {
+              run1 = run(node.expr[1], 1, node);
+              if (run1 === node) {throw new Error('returned circular local1')}
+              if (run1 && run1 !== node) {
+                node.expr[1] = run1;
+              }
+            }
+          }
+          if (node.expr[3].type === 'expression') {
+            run3 = run(node.expr[3], 3, node);
+            if (run3 === node) {throw new Error('returned circular expr3')}
+            if (run3) {
+              node.expr[3] = run3;
+            }
+          }
+          else if (node.expr[3].type === 'local') {
+            if (node.expr[3].name && scope.get(node.expr[3].name)) {
+              run3 = run(node.expr[3], 3, node);
+              if (run3 === node) {throw new Error('returned circular local3')}
+              if (run3) {
+                node.expr[3] = run3;
+              }
+            }
+          }
+
+          if (
+            node.expr[1] && node.expr[1].type === 'literal' &&
+            node.expr[3] && node.expr[3].type === 'literal'
+          ) {
+            if (node.expr[2].token === ' - ') {
+              return literal(
+                JSON.stringify(
+                  JSON.parse(node.expr[1].value) -
+                  JSON.parse(node.expr[3].value)
+                )
+              );
+            }
+            if (node.expr[2].token === ' * ') {
+              return literal(
+                JSON.stringify(
+                  JSON.parse(node.expr[1].value) *
+                  JSON.parse(node.expr[3].value)
+                )
+              );
+            }
+            if (node.expr[2].token === ' / ') {
+              return literal(
+                JSON.stringify(
+                  JSON.parse(node.expr[1].value) /
+                  JSON.parse(node.expr[3].value)
+                )
+              );
+            }
+          }
+          if (
+            node.expr[1] && node.expr[1].type === 'literal'
+          ) {
+            if (
+              node.expr[2].token === ' * ' &&
+              JSON.parse(node.expr[1].value) === 1
+            ) {
+              return node.expr[3];
+            }
+            if (
+              node.expr[2].token === ' * ' &&
+              JSON.parse(node.expr[1].value) === 0
+            ) {
+              return node.expr[1];
+            }
+          }
+          if (
+            node.expr[3] && node.expr[3].type === 'literal'
+          ) {
+            if (
+              node.expr[2].token === ' * ' &&
+              JSON.parse(node.expr[3].value) === 1
+            ) {
+              return node.expr[1];
+            }
+            if (
+              node.expr[2].token === ' * ' &&
+              JSON.parse(node.expr[3].value) === 0
+            ) {
+              return node.expr[3];
+            }
+          }
+        }
         else if (node.expr[2] && node.expr[2].token === ' + ') {
           let run1, run3;
           if (node.expr[1].type === 'expression') {
@@ -2043,6 +2168,7 @@ const compile = (node, options = {}) => {
   };
   context.context = context;
   context.compile = _compile.bind(null, context);
+  context.lookupScope = name => _compile_lookup(context.stack, context.scope, name);
 
   const ast = context.compile(node);
 

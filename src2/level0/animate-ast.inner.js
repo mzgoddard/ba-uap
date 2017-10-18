@@ -1,6 +1,7 @@
 const _ast = require('./function-ast');
 const astRegistry = require('./ast-registry');
 const ast = astRegistry(_ast);
+const math = require('./math-ast.inner');
 
 const r = _ast.r;
 
@@ -48,6 +49,70 @@ const lerp = ast.context(({
   })
 )));
 lerp.args = lerpArgs;
+
+const unionArgs = [['set'], r('set')];
+const union = ast.context(({
+  methods, func, for_of, call, r, lo, w, l, branch, and,
+}) => set => (
+  methods({
+    main: func(['t', 'state', 'begin', 'end'], [
+      for_of(set, ['key', 'value'], [
+        call(r('value'), [r('t'), r('state'), r('begin'), r('end')]),
+      ]),
+      r('state'),
+    ]),
+    set: methods(set),
+    a: func(['a', 't', 'state', 'begin', 'end'], [
+      for_of(set, ['key', 'value'], [
+        call(
+          lo(r('value'), l('a')),
+          [
+            lo(lo(r('a'), l('set')), r('key')),
+            r('t'),
+            r('state'),
+            r('begin'),
+            r('end'),
+          ]
+        ),
+      ]),
+      r('state'),
+    ]),
+    eq: func(['t', 'state', 'begin', 'end'], [
+      w('result', l(true)),
+      for_of(set, ['key', 'value'], [
+        branch(and(r('result'), call(lo(r('value'), l('eq')), [
+          r('t'),
+          r('state'),
+          r('begin'),
+          r('end'),
+        ])), [
+          w('result', l(false)),
+        ]),
+      ]),
+      r('result'),
+    ]),
+  })
+));
+union.args = unionArgs;
+
+const [
+  abs,
+  add, sub, mul, div, mod,
+  min, max,
+  eq, ne, lt, lte, gt, gte,
+] = [
+  'abs',
+  'add', 'sub', 'mul', 'div', 'mod',
+  'min', 'max',
+  'eq', 'ne', 'lt', 'lte', 'gt', 'gte',
+].map(ast.context(({l, r}) => op => (
+  math[op](
+    lerp,
+    v => l(v),
+    ['t', 'state', 'begin', 'end'],
+    [r('t'), r('state'), r('begin'), r('end')]
+  )
+)));
 
 const constantArgs = [['c'], r('c')];
 const constant = ast.context(({
@@ -159,6 +224,62 @@ const object = ast.context(({
 ));
 object.args = objectArgs;
 
+const arrayArgs = [['fn'], r('fn')];
+const array = ast.context(({
+  methods, func, w, l, loop, lt, r, lo, call, branch, add, and,
+}) => fn => (
+  methods({
+    main: func(['t', 'state', 'begin', 'end'], [
+      w('i', l(0)),
+      loop(lt(r('i'), lo(r('state'), l('length'))), [
+        call(l(fn), [
+          r('t'),
+          lo(r('state'), r('i')),
+          lo(r('begin'), r('i')),
+          lo(r('end'), r('i')),
+        ]),
+        w('i', add(r('i'), l(1))),
+      ]),
+      branch(r('i'), []),
+      r('state'),
+    ]),
+    fn: fn,
+    a: func(['a', 't', 'state', 'begin', 'end'], [
+      w('i', l(0)),
+      loop(lt(r('i'), lo(r('state'), l('length'))), [
+        call(lo(l(fn), l('a')), [
+          lo(r('a'), l('fn')),
+          r('t'),
+          lo(r('state'), r('i')),
+          lo(r('begin'), r('i')),
+          lo(r('end'), r('i')),
+        ]),
+        w('i', add(r('i'), l(1))),
+      ]),
+      branch(r('i'), []),
+      r('state'),
+    ]),
+    eq: func(['t', 'state', 'begin', 'end'], [
+      w('result', l(true)),
+      w('i', l(0)),
+      loop(lt(r('i'), lo(r('state'), l('length'))), [
+        branch(and(r('result'), call(lo(l(fn), l('eq')), [
+          r('t'),
+          lo(r('state'), r('i')),
+          lo(r('begin'), r('i')),
+          lo(r('end'), r('i')),
+        ])), [
+          w('result', l(false)),
+        ]),
+        w('i', add(r('i'), l(1))),
+      ]),
+      branch(r('i'), []),
+      r('result'),
+    ]),
+  })
+));
+array.args = arrayArgs;
+
 const easingArgs = [['fn', 'tfn'], r('fn'), r('tfn')];
 const easing = ast.context(({
   methods, func, call, l, r, lo
@@ -194,6 +315,161 @@ const easing = ast.context(({
   })
 ));
 easing.args = easingArgs;
+
+const easeInArgs = [['fn'], r('fn')];
+const easeIn = ast.context(({
+  func, mul, r, w,
+}) => fn => (
+  easing(fn, func(['t'], [
+    w('t', mul(mul(r('t'), r('t')), r('t'))),
+    r('t'),
+  ]))
+));
+easeIn.args = easeInArgs;
+
+const easeOutArgs = [['fn'], r('fn')];
+const easeOut = ast.context(({
+  func, mul, r, sub, w, l, add,
+}) => fn => (
+  easing(fn, func(['t'], [
+    w('t', sub(r('t'), l(1))),
+    add(mul(mul(r('t'), r('t')), r('t')), l(1)),
+  ]))
+));
+easeOut.args = easeOutArgs;
+
+const easeInOutArgs = [['fn'], r('fn')];
+const easeInOut = ast.context(({
+  func, mul, r, add, sub, l, lt, branch, w,
+}) => fn => (
+  easing(fn, func(['t'], [
+    w('out', r('t')),
+    branch(lt(r('t'), l(0.5)), [
+      w('out', mul(l(4), mul(mul(r('t'), r('t')), r('t'))))
+    ], [
+      w('out', add(
+        mul(
+          mul(
+            sub(r('t'), l(1)),
+            sub(mul(l(2), r('t')), l(2))
+          ),
+          sub(mul(l(2), r('t')), l(2))
+        ),
+        l(1)
+      ))
+    ]),
+    r('out'),
+  ]))
+));
+easeInOut.args = easeInOutArgs;
+
+const bezierC = ast.context(({
+  func, mul, l, r, w,
+}) => (
+  func(['x1', 'x2'], [
+    mul(l(3), r('x1')),
+  ])
+));
+
+const bezierB = ast.context(({
+  func, sub, mul, l, r, w, call,
+}) => (
+  func(['x1', 'x2'], [
+    // sub(mul(l(3), r('x2')), mul(l(6), r('x1'))),
+    w('c', call(bezierC, [r('x1'), r('x2')])),
+    sub(mul(l(3), sub(r('x2'), r('x1'))), r('c')),
+  ])
+));
+
+const bezierA = ast.context(({
+  func, sub, l, mul, r, w, call,
+}) => (
+  func(['x1', 'x2'], [
+    // sub(sub(l(1), mul(l(3), r('x2'))), mul(l(3), r('x1'))),
+    w('c', call(bezierC, [r('x1'), r('x2')])),
+    w('b', call(bezierB, [r('x1'), r('x2')])),
+    sub(sub(l(1), r('c')), r('b')),
+  ])
+));
+
+const bezierBez = ast.context(({
+  func, mul, r, add, call, w, l,
+}) => (
+  // t * (c(x1, x2) + t * (b(x1, x2) + t * a(x1, x2)));
+  func(['t', 'x1', 'x2'], [
+    w('c', call(bezierC, [r('x1'), r('x2')])),
+    w('b', call(bezierB, [r('x1'), r('x2')])),
+    w('a', call(bezierA, [r('x1'), r('x2')])),
+    mul(
+      r('t'),
+      add(
+        r('c'),
+        mul(
+          r('t'),
+          add(
+            r('b'),
+            mul(
+              r('t'),
+              r('a')
+            )
+          )
+        )
+      )
+    ),
+  ])
+));
+
+const bezierDeriv = ast.context(({
+  func, add, call, r, mul, l, w,
+}) => (
+  func(['t', 'x1', 'x2'], [
+    // c(x1, x2) + t * (2 * b(x1, x2) + 3 * a(x1, x2) * t);
+    w('c', call(bezierC, [r('x1'), r('x2')])),
+    w('b', call(bezierB, [r('x1'), r('x2')])),
+    w('a', call(bezierA, [r('x1'), r('x2')])),
+    add(
+      r('c'),
+      mul(
+        r('t'),
+        add(
+          mul(l(2), r('b')),
+          mul(
+            mul(l(3), r('a')),
+            r('t')
+          )
+        )
+      )
+    )
+  ])
+));
+
+const bezierSearch = ast.context(({
+  func, w, r, l, call, loop, and, lt, gte, abs, sub, div, add, branch,
+}) => (
+  func(['t', 'x1', 'x2'], [
+    w('x', r('t')),
+    w('i', l(0)),
+    w('z', sub(call(bezierBez, [r('x'), r('x1'), r('x2')]), r('t'))),
+    loop(and(lt(r('i'), l(14)), gte(abs(r('z')), l(1e-3))), [
+      w('x', sub(r('x'), div(r('z'), call(bezierDeriv, [r('x'), r('x1'), r('x2')])))),
+      w('z', sub(call(bezierBez, [r('x'), r('x1'), r('x2')]), r('t'))),
+      w('i', add(r('i'), l(1))),
+    ]),
+    branch(r('z'), []),
+    branch(r('i'), []),
+    r('x'),
+  ])
+));
+
+const bezierArgs = [['fn', 'ax', 'ay', 'bx', 'by'], r('fn'), r('ax'), r('ay'), r('bx'), r('by')];
+const bezier = ast.context(({
+  func, call, r, l, w, methods,
+}) => (fn, ax, ay, bx, by) => (
+  easing(fn, func(['t'], [
+    call(bezierBez, [call(bezierSearch, [r('t'), l(ax), l(bx)]), l(ay), l(by)]),
+  ]))
+));
+bezier.args = bezierArgs;
 
 const durationArgs = [['fn', 'duration'], r('fn'), r('duration')];
 const duration = ast.context(({
@@ -460,16 +736,50 @@ const object_to_example = () => to(
 );
 object_to_example.args = object_to_exampleArgs;
 
+const bezier_exampleArgs = [[]];
+const bezier_example = () => to(
+  object({
+    opacity: bezier(constant(0), 0, 1, 1, 0),
+    width: constant(100),
+  }),
+  object({
+    opacity: constant(1),
+    width: constant(200),
+  })
+);
+bezier_example.args = bezier_exampleArgs;
+
+const easeInOut_exampleArgs = [[]];
+const easeInOut_example = () => to(
+  object({
+    opacity: easeInOut(constant(0)),
+    width: bezier(constant(100), 0, 1, 1, 0),
+  }),
+  object({
+    opacity: constant(1),
+    width: constant(200),
+  })
+);
+easeInOut_example.args = easeInOut_exampleArgs;
+
 module.exports = {
   value,
   lerp,
+  union,
+  abs,
+  add, sub, mul, div, mod, min, max, eq, ne, lt, lte, gt, gte,
   constant,
   at,
   begin,
   end,
   fromTo,
   object,
+  array,
   easing,
+  easeIn,
+  easeOut,
+  easeInOut,
+  bezier,
   duration,
   to,
   keyframes,
@@ -479,5 +789,7 @@ module.exports = {
   percent,
   keyframes_example,
   object_to_example,
+  bezier_example,
+  easeInOut_example,
   repeat,
 };

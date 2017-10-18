@@ -1,6 +1,7 @@
 const _ast = require('./function-ast');
 const astRegistry = require('./ast-registry');
 const ast = astRegistry(_ast);
+const math = require('./math-ast.inner');
 
 const r = _ast.r;
 
@@ -16,6 +17,48 @@ const value = ast.context(({
   })
 ));
 value.args = valueArgs;
+
+const unionArgs = [['set'], r('set')];
+const union = ast.context(({
+  methods, func, for_of, call, r, lo, w, l, branch, and,
+}) => set => (
+  methods({
+    main: func(['element', 'state', 'animated'], [
+      for_of(set, ['key', 'value'], [
+        w('state', call(r('value'), [r('element'), r('state'), r('animated')])),
+      ]),
+      r('state'),
+    ]),
+    copy: func(['dest', 'src'], [
+      for_of(set, ['key', 'value'], [
+        w('dest', call(lo(r('value'), l('copy')), [
+          r('dest'), r('src'),
+        ])),
+      ]),
+      r('dest'),
+    ]),
+  })
+));
+union.args = unionArgs;
+
+const [
+  abs,
+  add, sub, mul, div, mod,
+  min, max,
+  eq, ne, lt, lte, gt, gte,
+] = [
+  'abs',
+  'add', 'sub', 'mul', 'div', 'mod',
+  'min', 'max',
+  'eq', 'ne', 'lt', 'lte', 'gt', 'gte',
+].map(ast.context(({l, r}) => op => (
+  math[op](
+    value,
+    v => l(v),
+    ['element', 'state', 'animated'],
+    [r('element'), r('state'), r('animated')]
+  )
+)));
 
 const identityArgs = [[]];
 const identity = ast.context(({
@@ -137,6 +180,113 @@ const elements = ast.context(({
 ));
 elements.args = elementsArgs;
 
+const elementArraysArgs = [['obj'], r('obj')];
+const elementArrays = ast.context(({
+  methods, func, w, r, or, l, for_of, st, call, lo, branch, body, loop, lt, add,
+}) => obj => (
+  methods({
+    main: func(['element', 'state', 'animated'], [
+      w('state', or(r('state'), l({}))),
+      w('rootElement', lo(
+        lo(
+          lo(r('animated'), l('animated')),
+          l('root')
+        ),
+        l('element')
+      )),
+      for_of(obj, ['key', 'value'], [
+        // animated.animated[key] = animated.animated[key] || {}
+        st(
+          lo(r('animated'), l('animated')),
+          r('key'),
+          or(lo(lo(r('animated'), l('animated')), r('key')), l({}))
+        ),
+        // animated.animated[key].elements = animated.animated[key].elements || []
+        st(
+          lo(lo(r('animated'), l('animated')), r('key')),
+          l('elements'),
+          or(lo(lo(lo(r('animated'), l('animated')), r('key')), l('elements')), l([]))
+        ),
+        // animated.animated[key].elements.length = 0
+        st(
+          lo(lo(lo(r('animated'), l('animated')), r('key')), l('elements')),
+          l('length'),
+          l(0),
+        ),
+        // dest = animated.animated[key].elements
+        w('dest', lo(lo(lo(r('animated'), l('animated')), r('key')), l('elements'))),
+        // src = rootElement.getElementsByClassName(key)
+        w('src', call(
+          lo(
+            r('rootElement'),
+            l('getElementsByClassName')
+          ),
+          [r('key')]
+        )),
+        // state[key] = state[key] || []
+        st(r('state'), r('key'), or(lo(r('state'), r('key')), l([]))),
+        // _state = state[key]
+        w('state', lo(r('state'), r('key'))),
+        // i = 0
+        w('i', l(0)),
+        // while (i < src.length) {
+        loop(lt(r('i'), lo(r('src'), l('length'))), [
+          // dest.push(src[i])
+          call(lo(r('dest'), l('push')), [lo(r('src'), r('i'))]),
+          // _state[i] = value(dest[i], _state[i], animated)
+          st(r('state'), r('i'), call(
+            r('value'),
+            [
+              lo(r('dest'), r('i')),
+              lo(r('state'), r('i')),
+              r('animated'),
+            ]
+          )),
+          // i = i + 1
+          w('i', add(r('i'), l(1))),
+        ]),
+        branch(r('i'), []),
+        body([]),
+      ]),
+      r('state'),
+    ]),
+    copy: func(['dest', 'src'], [
+      // _dest = dest || {}
+      w('dest', or(r('dest'), l({}))),
+      for_of(obj, ['key', 'value'], [
+        // _dest[key] = _dest[key] || []
+        st(r('dest'), r('key'), or(lo(r('dest'), r('key')), l([]))),
+        // dest2 = _dest[key]
+        w('dest2', lo(r('dest'), r('key'))),
+        // _src = src[key]
+        w('src', lo(r('src'), r('key'))),
+        // i = 0
+        w('i', l(0)),
+        loop(lt(r('i'), lo(r('src'), l('length'))), [
+          // dest2[i] = value.copy(dest2[i], src[i])
+          st(
+            r('dest2'),
+            r('i'),
+            call(
+              lo(r('value'), l('copy')),
+              [
+                lo(r('dest2'), r('i')),
+                lo(r('src'), r('i'))
+              ]
+            )
+          ),
+          // i = i + 1
+          w('i', add(r('i'), l(1))),
+        ]),
+        branch(r('i'), []),
+        body([]),
+      ]),
+      r('dest'),
+    ]),
+  })
+));
+elementArrays.args = elementArraysArgs;
+
 const propertiesArgs = [['obj'], r('obj')];
 const properties = ast.context(({
   methods, func, w, r, or, l, for_of, st, call, lo
@@ -247,11 +397,15 @@ should.args = shouldArgs;
 
 module.exports = {
   value,
+  union,
+  abs,
+  add, sub, mul, div, mod, min, max, eq, ne, lt, lte, gt, gte,
   identity,
   constant,
   property,
   object,
   elements,
+  elementArrays,
   properties,
   asElement,
   byElement: asElement,
