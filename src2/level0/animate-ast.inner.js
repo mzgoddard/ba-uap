@@ -478,7 +478,7 @@ const duration = ast.context(({
   methods({
     main: func(['t', 'state', 'begin', 'end'], [
       call(l(fn), [
-        mod(div(r('t'), l(duration)), l(1)),
+        div(r('t'), l(duration)),
         r('state'),
         r('begin'),
         r('end')
@@ -487,7 +487,7 @@ const duration = ast.context(({
     a: func(['a', 't', 'state', 'begin', 'end'], [
       call(lo(l(fn), l('a')), [
         r('a'),
-        mod(div(r('t'), l(duration)), l(1)),
+        div(r('t'), l(duration)),
         r('state'),
         r('begin'),
         r('end')
@@ -499,6 +499,35 @@ const duration = ast.context(({
   })
 ));
 duration.args = durationArgs;
+
+const loopArgs = [['fn', 'loop'], r('fn'), r('loop')];
+const loop = ast.context(({
+  methods, func, call, l, r, lo, div, gte, mod,
+}) => (fn, loop) => (
+  methods({
+    main: func(['t', 'state', 'begin', 'end'], [
+      call(l(fn), [
+        mod(r('t'), l(loop)),
+        r('state'),
+        r('begin'),
+        r('end')
+      ]),
+    ]),
+    a: func(['a', 't', 'state', 'begin', 'end'], [
+      call(lo(l(fn), l('a')), [
+        r('a'),
+        mod(r('t'), l(loop)),
+        r('state'),
+        r('begin'),
+        r('end')
+      ]),
+    ]),
+    eq: func(['t', 'state', 'begin', 'end'], [
+      gte(mod(r('t'), l(loop)), l(1)),
+    ]),
+  })
+));
+loop.args = loopArgs;
 
 const repeatArgs = [['fn', 'until'], r('fn'), r('until')];
 const repeat = ast.context(({
@@ -791,5 +820,6 @@ module.exports = {
   object_to_example,
   bezier_example,
   easeInOut_example,
-  repeat,
+  until: repeat,
+  loop,
 };
