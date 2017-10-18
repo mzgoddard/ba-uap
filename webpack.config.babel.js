@@ -14,6 +14,8 @@ module.exports = {
     'preact-crawl': './src2/level3/preact-crawl',
     preact: './src2/level3/preact',
     'preact-no0': './src2/level3/preact-no0',
+    svg: './src2/level3/svg',
+    'svg-no0': './src2/level3/svg-no0',
   },
   output: {
     path: dir('dist'),
