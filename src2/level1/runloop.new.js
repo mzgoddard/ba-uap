@@ -28,48 +28,40 @@ const control = function(_this, input) {
   const oldState = _this._state;
   let state = _this._state;
 
-  if (oldState === EMPTY) {
-    if (input === RESUME) {
-      state = BOUND;
-    }
-    else if (input === ADD) {
-      state = HOLDING;
-    }
+  if (
+    state === EMPTY && input === RESUME ||
+    state === RUNNING && input === REMOVE
+  ) {
+    state = BOUND;
   }
-  else if (oldState === HOLDING) {
-    if (input === RESUME) {
-      state = RUNNING;
-    }
-    else if (input === REMOVE) {
-      state = EMPTY;
-    }
+  else if (
+    state === EMPTY && input === ADD ||
+    state === RUNNING && input === PAUSE
+  ) {
+    state = HOLDING;
   }
-  else if (state === BOUND) {
-    if (input === PAUSE) {
-      state = EMPTY;
-    }
-    else if (input === ADD) {
-      state = RUNNING;
-    }
+  else if (
+    state === HOLDING && input === RESUME ||
+    state === BOUND && input === ADD
+  ) {
+    state = RUNNING;
   }
-  else if (state === RUNNING) {
-    if (input === PAUSE) {
-      state = HOLDING;
-    }
-    else if (input === REMOVE) {
-      state = BOUND;
-    }
+  else if (
+    state === HOLDING && input === REMOVE ||
+    state === BOUND && input === PAUSE
+  ) {
+    state = EMPTY;
   }
 
   if (state !== oldState) {
     _this._state = state;
 
     if (oldState === RUNNING) {
-      _this.cancelFrame.call(null, _this._frameId);
+      _this.cancelFrame();
     }
     else if (state === RUNNING) {
       _this.last = _this.now();
-      _this._frameId = _this.requestFrame.call(null, _this.loop);
+      _this._frameId = _this.requestFrame();
     }
   }
 };
@@ -84,6 +76,49 @@ const _soonNull = function() {
   this._soon = null;
 };
 
+const loop = function(_this) {
+  _this.requestFrame();
+
+  const {cleanup} = _this;
+  let oldItem, oldData, index;
+  for (let i = 0, l = cleanup.length; i < l; i += 2) {
+    oldItem = cleanup[i + 0];
+    oldData = cleanup[i + 1];
+    for (let stage of _this.stages) {
+      index = stage.findIndex((item, i) => (
+        i % 2 === 0 &&
+        item === oldItem && stage[i + 1] === oldData
+      ));
+      if (index !== -1) {
+        stage.splice(index, 2);
+        _this.itemCount -= 1;
+        break;
+      }
+    }
+  }
+  cleanup.length = 0;
+
+  if (_this.itemCount === 0) {
+    control(_this, REMOVE);
+    return;
+  }
+
+  const now = _this.now();
+  const dt = Math.min((now - _this.last) / 1000, MAX_DT);
+  _this.last = now;
+
+  for (let stage of _this.stages) {
+    for (let i = 0; i < stage.length; i += 2) {
+      try {
+        stage[i + 0](stage[i + 1], dt);
+      }
+      catch (error) {
+        console.error(error ? (error.stack || error) : error);
+      }
+    }
+  }
+}
+
 class RunLoop {
   constructor({
     requestFrame = window.requestAnimationFrame,
@@ -96,56 +131,16 @@ class RunLoop {
     this.stages = [[], [], [], [], []];
     this.cleanup = [];
 
-    this.requestFrame = requestFrame;
-    this.cancelFrame = cancelFrame;
-    this.now = now;
-
     this._remove = _remove.bind(this);
     this._soonNull = _soonNull.bind(this);
-    this.loop = this.loop.bind(this);
-  }
 
-  loop() {
-    this._frameId = this.requestFrame.call(null, this.loop);
-
-    const {cleanup} = this;
-    let oldItem, oldData, index;
-    for (let i = 0, l = cleanup.length; i < l; i += 2) {
-      oldItem = cleanup[i + 0];
-      oldData = cleanup[i + 1];
-      for (let stage of this.stages) {
-        index = stage.findIndex((item, i) => (
-          i % 2 === 0 &&
-          item === oldItem && stage[i + 1] === oldData
-        ));
-        if (index !== -1) {
-          stage.splice(index, 2);
-          this.itemCount -= 1;
-          break;
-        }
-      }
-    }
-    cleanup.length = 0;
-
-    if (this.itemCount === 0) {
-      control(this, REMOVE);
-      return;
-    }
-
-    const now = this.now();
-    const dt = Math.min((now - this.last) / 1000, MAX_DT);
-    this.last = now;
-
-    for (let stage of this.stages) {
-      for (let i = 0; i < stage.length; i += 2) {
-        try {
-          stage[i + 0](stage[i + 1], dt);
-        }
-        catch (error) {
-          console.error(error ? (error.stack || error) : error);
-        }
-      }
-    }
+    this.requestFrame = () => {
+      this._frameId = requestFrame.call(null, () => loop(this));
+    };
+    this.cancelFrame = () => {
+      cancelFrame.call(null, this._frameId);
+    };
+    this.now = now;
   }
 
   pause() {
