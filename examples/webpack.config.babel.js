@@ -28,6 +28,7 @@ module.exports = {
     'preact-ref-test': './preact-ref-test',
     '2048-1': './2048-1',
     'shapes': './shapes',
+    'svg': './svg',
   },
   output: {
     path: dir('../dist'),
@@ -86,6 +87,21 @@ module.exports = {
         },
       },
       {
+        test: /\.js$/,
+        include: [
+          dir('svg'),
+        ],
+        loader: 'babel-loader',
+        options: {
+          presets: [
+            ['env', {
+              modules: false,
+              loose: true
+            }],
+          ],
+        },
+      },
+      {
         test: /\.styl$/,
         use: ['style-loader', 'css-loader', 'stylus-loader'],
       },
@@ -116,6 +132,12 @@ module.exports = {
     //   recordsPath: dir('../node_modules/.cache/hard-source/[confighash]/records.json'),
     //   configHash: require('node-object-hash')().hash,
     // }),
+    new HtmlWebpackPlugin({
+      filename: `svg/dot-plus.svg`,
+      template: `./svg/dot-plus.svg.js`,
+      chunks: ['svg', 'vendor'],
+      inject: 'svg',
+    }),
   ].concat([
     'moving-box',
     'many-boxes',
