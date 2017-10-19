@@ -240,6 +240,9 @@ const _compile_literal = ({compile, pointer, stack, scope}) => {
   else if (typeof pointer.value === 'string') {
     return literal(JSON.stringify(pointer.value));
   }
+  else if (Array.isArray(pointer.value)) {
+    return expr([token('['), token(']')]);
+  }
   else if (typeof pointer.value === 'object') {
     const entries = Object.entries(pointer.value);
     return expr(

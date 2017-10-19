@@ -226,7 +226,7 @@ const elementArrays = ast.context(({
         // state[key] = state[key] || []
         st(r('state'), r('key'), or(lo(r('state'), r('key')), l([]))),
         // _state = state[key]
-        w('state', lo(r('state'), r('key'))),
+        w('state2', lo(r('state'), r('key'))),
         // i = 0
         w('i', l(0)),
         // while (i < src.length) {
@@ -234,11 +234,11 @@ const elementArrays = ast.context(({
           // dest.push(src[i])
           call(lo(r('dest'), l('push')), [lo(r('src'), r('i'))]),
           // _state[i] = value(dest[i], _state[i], animated)
-          st(r('state'), r('i'), call(
+          st(r('state2'), r('i'), call(
             r('value'),
             [
               lo(r('dest'), r('i')),
-              lo(r('state'), r('i')),
+              lo(r('state2'), r('i')),
               r('animated'),
             ]
           )),
@@ -259,11 +259,11 @@ const elementArrays = ast.context(({
         // dest2 = _dest[key]
         w('dest2', lo(r('dest'), r('key'))),
         // _src = src[key]
-        w('src', lo(r('src'), r('key'))),
+        w('src2', lo(r('src'), r('key'))),
         // i = 0
         w('i', l(0)),
-        loop(lt(r('i'), lo(r('src'), l('length'))), [
-          // dest2[i] = value.copy(dest2[i], src[i])
+        loop(lt(r('i'), lo(r('src2'), l('length'))), [
+          // dest2[i] = value.copy(dest2[i], src2[i])
           st(
             r('dest2'),
             r('i'),
@@ -271,7 +271,7 @@ const elementArrays = ast.context(({
               lo(r('value'), l('copy')),
               [
                 lo(r('dest2'), r('i')),
-                lo(r('src'), r('i'))
+                lo(r('src2'), r('i'))
               ]
             )
           ),

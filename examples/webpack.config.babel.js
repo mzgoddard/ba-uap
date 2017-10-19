@@ -28,7 +28,8 @@ module.exports = {
     'preact-ref-test': './preact-ref-test',
     '2048-1': './2048-1',
     'shapes': './shapes',
-    'svg': './svg',
+    'dot-plus': './svg/dot-plus',
+    'spin-plus': './svg/spin-plus',
   },
   output: {
     path: dir('../dist'),
@@ -132,13 +133,48 @@ module.exports = {
     //   recordsPath: dir('../node_modules/.cache/hard-source/[confighash]/records.json'),
     //   configHash: require('node-object-hash')().hash,
     // }),
+    {
+      apply: function(compiler) {
+        compiler.plugin('compilation', function(compilation) {
+          compilation.plugin('html-webpack-plugin-after-html-processing', function(htmlPluginData, cb) {
+            if (
+              htmlPluginData.outputName.endsWith('.svg') &&
+              htmlPluginData.html.indexOf('<script>') === -1
+            ) {
+              htmlPluginData.html = htmlPluginData.html.replace('</svg>', '') +
+                [
+                  '<script type="text/javascript" charset="utf8"><![CDATA[',
+                  htmlPluginData.plugin.options.chunks
+                  .map(name => (
+                    Object.entries(compilation.assets)
+                    .find(([key]) => (
+                      key.indexOf(name) !== -1 && key.endsWith('.js')
+                    ))[1]
+                    .source()
+                  ))
+                  .join('\n'),
+                  ']]></script>',
+                  '</svg>',
+                ].join('\n');
+            }
+            cb(null, htmlPluginData);
+          });
+        });
+      },
+    },
+  ]
+  .concat([
+    'dot-plus',
+    'spin-plus',
+  ].map(name => (
     new HtmlWebpackPlugin({
-      filename: `svg/dot-plus.svg`,
-      template: `./svg/dot-plus.svg.js`,
-      chunks: ['svg', 'vendor'],
-      inject: 'svg',
-    }),
-  ].concat([
+      filename: `svg/${name}.svg`,
+      template: `./svg/${name}.svg.js`,
+      chunks: [name],
+      inject: false,
+    })
+  )))
+  .concat([
     'moving-box',
     'many-boxes',
     'flip',

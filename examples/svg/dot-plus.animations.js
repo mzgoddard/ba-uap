@@ -189,6 +189,7 @@ const animations = {
           })),
         ])
         .duration(2)
+        .loop(2)
         .until(t => 0)
       )),
       present: present.context(({elements, style, scale, rotatez, concat, constant, key}) => (

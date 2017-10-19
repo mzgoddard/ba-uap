@@ -40,13 +40,13 @@ const union = ast.context(({
       ]),
       r('element'),
     ]),
-    main: func(['state', 'element', 'animated'], [
+    store: func(['state', 'element', 'animated'], [
       for_of(set, ['key', 'value'], [
         w('state', call(lo(r('value'), l('store')), [r('state'), r('element'), r('animated')])),
       ]),
       r('state'),
     ]),
-    main: func(['element', 'state', 'animated'], [
+    restore: func(['element', 'state', 'animated'], [
       for_of(set, ['key', 'value'], [
         call(lo(r('value'), l('restore')), [r('element'), r('state'), r('animated')]),
       ]),

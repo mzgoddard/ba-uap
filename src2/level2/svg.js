@@ -10,7 +10,7 @@ class AnimatedSvg {
     const {element, initialState} = options;
     this.state = new AnimatedState(this.animations);
     if (element) {
-      this.state.schedule(element, this.loop);
+      this.state.schedule({root: {element}}, this.loop);
     }
     if (initialState) {
       this.set(initialState);

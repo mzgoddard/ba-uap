@@ -26,9 +26,35 @@ const DotPlus = () => (
   </div>
 );
 
+const PlusSpinner = ({class: className = "plusA", fill = '#dddddd', style = {}}) => (
+  <g style={style} fill={fill}>
+    <g class={className}>
+      <polygon points="16.67,50 16.67,16.67 50,16.67 50,-16.67 16.67,-16.67 16.67,-50 -16.67,-50 -16.67,-16.67 -50,-16.67 -50,16.67 -16.67,16.67 -16.67,50" />
+    </g>
+  </g>
+);
+
+const SpinnerIllusion = () => (
+  <svg class="spinnerIllusion" width="100" height="100" viewBox="0 0 166 166">
+    <rect class="backA" x="0" y="0" width="166" height="166" fill="#dddddd" />
+    <rect class="backB" x="0" y="0" width="166" height="166" fill="#666666" />
+    <PlusSpinner class="plusA" style={{transform: 'translate(50px, 50px)'}} fill="#dddddd" />
+    <PlusSpinner class="plusA" style={{transform: 'translate(150px, 83.33px)'}} fill="#dddddd" />
+    <PlusSpinner class="plusA" style={{transform: 'translate(183.33px, -16.67px)'}} fill="#dddddd" />
+    <PlusSpinner class="plusA" style={{transform: 'translate(16.67px, 150px)'}} fill="#dddddd" />
+    <PlusSpinner class="plusA" style={{transform: 'translate(116.67px, 183.33px)'}} fill="#dddddd" />
+    <PlusSpinner class="plusB" style={{transform: 'translate(16.67px, -16.67px)'}} fill="#666666" />
+    <PlusSpinner class="plusB" style={{transform: 'translate(116.67px, 16.67px)'}} fill="#666666" />
+    <PlusSpinner class="plusB" style={{transform: 'translate(83.33px, 116.67px)'}} fill="#666666" />
+    <PlusSpinner class="plusB" style={{transform: 'translate(-16.67px, 83.33px)'}} fill="#666666" />
+    <PlusSpinner class="plusB" style={{transform: 'translate(183.33px, 150px)'}} fill="#666666" />
+  </svg>
+);
+
 const Shapes = () => (
   <div style={{height: '100vh', transform: 'translateZ(0)'}}>
     <DotPlus />
+    <SpinnerIllusion />
   </div>
 );
 
