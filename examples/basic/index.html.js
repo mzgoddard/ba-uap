@@ -5,7 +5,6 @@ export default `<!doctype html>
   </head>
   <body>
     <div id="root"></div>
-    <img src="../svg/spin-plus.svg" />
   </body>
 </html>
 `

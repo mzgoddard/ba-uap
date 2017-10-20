@@ -233,7 +233,7 @@ const animations = {
   spinnerIllusion: {
     default: {
       update: update.context(({
-        object, elementArrays, constant, union, elements,
+        object, elementArrays, constant, union, elements, value,
       }) => (
         union([
           elements({
@@ -246,18 +246,18 @@ const animations = {
           }),
           elementArrays({
             plusA: object({
-              angle: constant(0),
+              angle: constant(0.25),
               opacity: constant(1),
             }),
             plusB: object({
-              angle: constant(0),
+              angle: constant(-0.25),
               opacity: constant(1),
             }),
           }),
         ])
       )),
       animate: animate.context(({
-        object, array, constant, keyframes, seconds,
+        object, array, constant, keyframes, seconds, end,
       }) => (
         object({
           backB: object({
@@ -272,8 +272,8 @@ const animations = {
             // angle: constant(0).to(constant(1)),
             angle: keyframes([
               seconds(1, constant(0)),
-              seconds(1, constant(0.25)),
-              seconds(0, constant(0.25)),
+              seconds(1, end()),
+              seconds(0, end()),
             ]),
             opacity: keyframes([
               seconds(1, constant(1)),
